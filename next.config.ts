@@ -4,6 +4,7 @@ const nextConfig: NextConfig = {
   // Self-hosted on the customer's server: build a standalone server bundle for Docker
   output: "standalone",
   poweredByHeader: false,
+  devIndicators: false,
   turbopack: {
     rules: {
       "*.css": {
