@@ -12,6 +12,13 @@ const nextConfig: NextConfig = {
       },
     },
   },
+  async redirects() {
+    return [
+      // links stored in notifications by the database (act_request) → employee app
+      { source: "/me/requests", has: [{ type: "query", key: "id", value: "(?<id>\\d+)" }], destination: "/m/requests/:id", permanent: false },
+      { source: "/me/requests", destination: "/m/requests", permanent: false },
+    ];
+  },
   experimental: {
     serverActions: { bodySizeLimit: "10mb" },
   },

@@ -274,6 +274,9 @@ function UserMenu({ me }: { me: Me }) {
             <Link href="/account/password" className="block px-3 py-2 text-sm hover:bg-paper" onClick={() => setOpen(false)}>
               เปลี่ยนรหัสผ่าน
             </Link>
+            <Link href="/settings/signature" className="block px-3 py-2 text-sm hover:bg-paper" onClick={() => setOpen(false)}>
+              ลายเซ็นของฉัน
+            </Link>
             <button
               className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-rust hover:bg-rust-soft"
               onClick={async () => {
