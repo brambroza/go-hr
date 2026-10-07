@@ -18,10 +18,11 @@ import { PrivateTab } from "./tab-private";
 import { AddressTab, FamilyTab, EducationTab, WorkHistoryTab, SkillsTab, GuaranteeTab, FundsTab, TrainingTab, AssetsTab, DocumentsTab, SalaryHistoryTab, MovementsTab } from "./tab-children";
 import { TaxTab } from "./tab-tax";
 import { AccountTab } from "./tab-account";
+import { FacesTab } from "./tab-faces";
 
 type TabKey =
   | "personal" | "employment" | "private" | "address" | "family" | "education" | "work" | "skills" | "tax" | "guarantee"
-  | "funds" | "training" | "assets" | "documents" | "salary" | "movements" | "account";
+  | "funds" | "training" | "assets" | "documents" | "salary" | "movements" | "faces" | "account";
 
 type TabDef = { key: TabKey; label: string; show: boolean; render: (p: TabProps) => ReactNode };
 
@@ -69,6 +70,7 @@ export function EmployeeProfile({ id }: { id: number }) {
     { key: "documents", label: "เอกสาร", show: true, render: (p) => <DocumentsTab {...p} /> },
     { key: "salary", label: "ประวัติเงินเดือน", show: canPrivate, render: (p) => <SalaryHistoryTab {...p} /> },
     { key: "movements", label: "ประวัติการเคลื่อนไหว", show: true, render: (p) => <MovementsTab {...p} /> },
+    { key: "faces", label: "ข้อมูลใบหน้า", show: can("employee", "edit") || can("attendance", "view"), render: (p) => <FacesTab {...p} /> },
     { key: "account", label: "บัญชีผู้ใช้", show: can("security", "view") || isSelf, render: (p) => <AccountTab {...p} /> },
   ];
   const visible = tabs.filter((t) => t.show);

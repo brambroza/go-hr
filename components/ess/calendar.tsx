@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { Badge, clsx, Modal, Spinner } from "@/components/ui";
+import { Badge, Button, clsx, Modal, Spinner, toast } from "@/components/ui";
 import { useMe } from "@/components/app/me-context";
 import { supabaseBrowser } from "@/lib/supabase/client";
 import { isoDate, minutesToHM, parseDate, thDate, thMonthYear, thTime, TH_DAYS, TH_DAYS_SHORT } from "@/lib/format";
@@ -27,6 +27,8 @@ export function MyCalendar() {
   const [logs, setLogs] = useState<Map<string, Log[]>>(new Map());
   const [leaves, setLeaves] = useState<Lv[]>([]);
   const [sel, setSel] = useState<string | null>(null);
+  const [allowSelf, setAllowSelf] = useState(false);
+  const [reload, setReload] = useState(0);
 
   const y = Number(ym.slice(0, 4));
   const m = Number(ym.slice(5, 7));
@@ -36,7 +38,9 @@ export function MyCalendar() {
 
   useEffect(() => {
     const sb = supabaseBrowser();
-    sb.from("shifts").select("id, code, name, color, start_time, end_time").then(({ data }: { data: unknown }) => setShifts(new Map(((data as Shift[]) ?? []).map((s) => [s.id, s]))));
+    sb.from("shifts").select("id, code, name, color, start_time, end_time").eq("is_active", true).then(({ data }: { data: unknown }) => setShifts(new Map(((data as Shift[]) ?? []).map((s) => [s.id, s]))));
+    // วางแผนกะการทำงาน-วันหยุดของตนเอง (เปิดได้ที่ ตั้งค่า → เวลาทำงาน)
+    sb.from("settings").select("value").eq("key", "attendance").maybeSingle().then(({ data }: { data: { value?: { allow_self_schedule?: boolean } } | null }) => setAllowSelf(!!data?.value?.allow_self_schedule));
   }, []);
 
   useEffect(() => {
@@ -60,7 +64,7 @@ export function MyCalendar() {
       setLogs(lm);
       setLeaves((r.data as Lv[]) ?? []);
     })();
-  }, [from, to, me.employeeId]);
+  }, [from, to, me.employeeId, reload]);
 
   const leaveOn = (date: string) => leaves.filter((l) => date >= l.start_date && date <= (l.end_date ?? l.start_date));
   const firstDow = parseDate(from)!.getDay();
@@ -148,6 +152,7 @@ export function MyCalendar() {
             att={att.get(s.work_date) ?? null}
             logs={logs.get(s.work_date) ?? []}
             leaves={leaveOn(s.work_date)}
+            plan={allowSelf && s.work_date >= today ? { employeeId: me.employeeId!, shifts: [...shifts.values()], onDone: () => { setSel(null); setReload((n) => n + 1); } } : null}
           />
         )}
       </Modal>
@@ -155,8 +160,26 @@ export function MyCalendar() {
   );
 }
 
-function DayDetail({ day, shift, att, logs, leaves }: { day: Day; shift: Shift | null; att: Att | null; logs: Log[]; leaves: Lv[] }) {
+type Plan = { employeeId: number; shifts: Shift[]; onDone: () => void };
+
+function DayDetail({ day, shift, att, logs, leaves, plan }: { day: Day; shift: Shift | null; att: Att | null; logs: Log[]; leaves: Lv[]; plan: Plan | null }) {
   const off = day.day_type === "off" || day.day_type === "holiday";
+  const [busy, setBusy] = useState(false);
+  const save = async (value: { shift_id: number | null; is_day_off: boolean } | null) => {
+    if (!plan) return;
+    setBusy(true);
+    const sb = supabaseBrowser();
+    const res = value
+      ? await sb.from("work_schedules").upsert({ employee_id: plan.employeeId, work_date: day.work_date, ...value, source: "self" }, { onConflict: "employee_id,work_date" })
+      : await sb.from("work_schedules").delete().eq("employee_id", plan.employeeId).eq("work_date", day.work_date).eq("source", "self");
+    setBusy(false);
+    if (res.error) {
+      toast.error(res.error.message.includes("row-level security") ? "วันนี้ฝ่ายบุคคลจัดตารางไว้แล้ว เปลี่ยนเองไม่ได้ — ยื่นขอเปลี่ยนกะแทน" : res.error.message);
+      return;
+    }
+    toast.ok(value ? "บันทึกแผนการทำงานแล้ว" : "กลับไปใช้ตารางปกติแล้ว");
+    plan.onDone();
+  };
   return (
     <div className="flex flex-col gap-3 text-[15px]">
       <div className="flex flex-wrap items-center gap-2">
@@ -196,6 +219,26 @@ function DayDetail({ day, shift, att, logs, leaves }: { day: Day; shift: Shift |
           {att.early_minutes > 0 && <Badge color="red">กลับก่อน {att.early_minutes} นาที</Badge>}
           {att.missing_scan && <Badge color="amber">สแกนไม่ครบ</Badge>}
           {att.work_minutes > 0 && <Badge color="green">ทำงาน {minutesToHM(att.work_minutes)} ชม.</Badge>}
+        </div>
+      )}
+      {plan && (
+        <div className="border-t border-line-soft pt-3">
+          <div className="mb-2 text-sm text-ink-soft">วางแผนวันนี้ด้วยตนเอง</div>
+          <div className="flex flex-wrap gap-2">
+            {plan.shifts.map((sh) => (
+              <Button key={sh.id} size="sm" variant={!off && shift?.id === sh.id ? "primary" : "secondary"} disabled={busy} onClick={() => save({ shift_id: sh.id, is_day_off: false })}>
+                {sh.code} {sh.start_time.slice(0, 5)}–{sh.end_time.slice(0, 5)}
+              </Button>
+            ))}
+            <Button size="sm" variant={day.day_type === "off" ? "primary" : "secondary"} disabled={busy} onClick={() => save({ shift_id: null, is_day_off: true })}>
+              วันหยุด
+            </Button>
+            {day.is_override && (
+              <Button size="sm" variant="ghost" disabled={busy} onClick={() => save(null)}>
+                ใช้ตารางปกติ
+              </Button>
+            )}
+          </div>
         </div>
       )}
     </div>

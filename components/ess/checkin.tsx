@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Camera, CheckCircle2, CloudOff, Crosshair, LocateFixed, MapPin, QrCode, RefreshCw, TriangleAlert, X } from "lucide-react";
+import { Camera, CheckCircle2, CloudOff, Crosshair, LocateFixed, MapPin, QrCode, RefreshCw, ScanFace, TriangleAlert, Wifi, X } from "lucide-react";
+import dynamic from "next/dynamic";
 import { Button, clsx, Spinner, toast } from "@/components/ui";
 import { useMe } from "@/components/app/me-context";
 import { supabaseBrowser } from "@/lib/supabase/client";
@@ -11,10 +12,21 @@ import { useToday } from "./today";
 import { DAY_TYPE_LABEL, DIRECTIONS, DIRECTION_LABEL, distanceM, errText, fmtDistance, isNetworkError, SOURCE_LABEL } from "./lib";
 import { enqueueCheckin, onQueueChange, queuedCheckins, removeQueued, syncQueue, type QueuedCheckin } from "./offline-queue";
 import { QrScanner } from "./qr-scanner";
+import type { FaceCapture } from "./face-scan";
+import { toPgArray } from "./face-api-loader";
+
+// face-api + TensorFlow.js are loaded only when the "สแกนใบหน้า" tab is opened
+const FaceCamera = dynamic(() => import("./face-scan").then((m) => m.FaceCamera), {
+  ssr: false,
+  loading: () => <div className="grid aspect-square w-full place-items-center rounded-[var(--radius-panel)] bg-jade-950 text-sm text-jade-100">กำลังโหลดระบบสแกนใบหน้า…</div>,
+});
+
+type Method = "gps" | "qr" | "face" | "wifi";
+type NetInfo = { loading: boolean; ip: string | null; locations: { id: number; name: string }[]; message: string | null };
 
 type Loc = { id: number; name: string; latitude: number | null; longitude: number | null; radius_m: number; allow_gps: boolean; allow_qr: boolean; require_photo: boolean; is_active: boolean };
 type Fix = { lat: number; lng: number; acc: number; at: number };
-type Result = { ok: true; time: string; location: string | null; distance: number | null; offline?: boolean } | { ok: false; message: string };
+type Result = { ok: true; time: string; location: string | null; distance: number | null; offline?: boolean; extra?: string } | { ok: false; message: string };
 
 /* ------------------------------------------------------------------ live clock */
 function useNow(intervalMs = 1000) {
@@ -67,7 +79,9 @@ export function CheckinScreen() {
   const me = useMe();
   const now = useNow();
   const { data: today, reload } = useToday();
-  const [method, setMethod] = useState<"gps" | "qr">("gps");
+  const [method, setMethod] = useState<Method>("gps");
+  const [faceReset, setFaceReset] = useState(0);
+  const [net, setNet] = useState<NetInfo | null>(null);
   const [direction, setDirection] = useState("auto");
   const [locs, setLocs] = useState<Loc[]>([]);
   const [allowedIds, setAllowedIds] = useState<number[] | null>(null);
@@ -78,6 +92,10 @@ export function CheckinScreen() {
   const [online, setOnline] = useState(true);
   const [manualQr, setManualQr] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
+  const resultRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (result && method !== "gps") resultRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [result, method]);
   const geo = useGeo(true);
 
   useEffect(() => {
@@ -122,7 +140,19 @@ export function CheckinScreen() {
     return best;
   }, [geo.fix, locs, allowedIds]);
   const inside = nearest ? nearest.dist <= nearest.loc.radius_m + Math.min(geo.fix?.acc ?? 0, 100) : false;
-  const photoRequired = method === "gps" ? !!nearest?.loc.require_photo : false;
+  const netLoc = method === "wifi" && net?.locations[0] ? locs.find((l) => l.id === net.locations[0].id) : undefined;
+  const photoRequired = method === "gps" ? !!nearest?.loc.require_photo : method === "wifi" ? !!netLoc?.require_photo : false;
+
+  const checkNetwork = useCallback(async () => {
+    setNet((n) => ({ ip: n?.ip ?? null, locations: n?.locations ?? [], message: null, loading: true }));
+    try {
+      const r = await fetch("/api/checkin/network", { cache: "no-store" });
+      const j = (await r.json()) as Partial<NetInfo> & { error?: string };
+      setNet({ loading: false, ip: j.ip ?? null, locations: j.locations ?? [], message: j.error ?? j.message ?? null });
+    } catch {
+      setNet({ loading: false, ip: null, locations: [], message: "ติดต่อเซิร์ฟเวอร์ไม่ได้ — ตรวจสอบการเชื่อมต่อแล้วลองใหม่" });
+    }
+  }, []);
 
   const scans = today?.scans ?? [];
   const autoLabel = scans.length === 0 ? "ลงเวลาเข้างาน" : "ลงเวลาออกงาน";
@@ -215,6 +245,81 @@ export function CheckinScreen() {
     }
   }
 
+  /** face scan captured (liveness passed) → upload selfie → server matches the descriptor */
+  async function submitFace(c: FaceCapture) {
+    setResult(null);
+    if (!navigator.onLine) {
+      const message = "ออฟไลน์อยู่ ลงเวลาด้วยใบหน้าไม่ได้ — ใช้ GPS แทน ระบบจะส่งให้เมื่อกลับมาออนไลน์";
+      setResult({ ok: false, message });
+      throw new Error(message);
+    }
+    if (!geo.fix) {
+      const message = geo.error ?? "ยังหาตำแหน่งไม่ได้ รอสักครู่แล้วสแกนอีกครั้ง";
+      setResult({ ok: false, message });
+      throw new Error(message);
+    }
+    setBusy(true);
+    try {
+      const photo = await resizeImage(c.photo, 640, 0.8);
+      const up = await uploadFile("checkins", photo, { folder: isoDate(), name: "face.jpg" });
+      const { data, error } = await supabaseBrowser().rpc("check_in_face", {
+        p_descriptor: toPgArray(c.descriptor),
+        p_latitude: geo.fix.lat,
+        p_longitude: geo.fix.lng,
+        p_accuracy: Math.round(geo.fix.acc),
+        p_photo_url: up.url,
+        p_direction: direction,
+      });
+      if (error) throw error;
+      const d = data as { ok: boolean; error?: string; time: string; location: string | null; distance: number | null; face_score?: number };
+      if (!d.ok) throw new Error(d.error ?? "ใบหน้าไม่ตรงกับที่ลงทะเบียนไว้");
+      setResult({ ok: true, time: d.time, location: d.location, distance: d.distance, extra: d.face_score != null ? `ใบหน้าตรงกัน ${Math.round(d.face_score * 100)}%` : undefined });
+      if ("vibrate" in navigator) navigator.vibrate?.(60);
+      reload();
+    } catch (e) {
+      const message = isNetworkError(e) ? "ส่งข้อมูลไม่ได้ — ตรวจสอบอินเทอร์เน็ตแล้วสแกนใหม่" : errText(e);
+      setResult({ ok: false, message });
+      throw new Error(message);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /** office network: the server reads our IP and finds the location */
+  async function submitWifi() {
+    if (busy) return;
+    setResult(null);
+    if (photoRequired && !photo) {
+      setResult({ ok: false, message: `จุด ${netLoc?.name ?? ""} ต้องถ่ายรูปประกอบการลงเวลา — กด ‘ถ่ายรูปยืนยัน’ ก่อน` });
+      return;
+    }
+    setBusy(true);
+    try {
+      let photoUrl: string | null = null;
+      if (photo) photoUrl = await uploadPhoto();
+      const r = await fetch("/api/checkin/network", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ direction, ...(photoUrl ? { photo_url: photoUrl } : {}) }),
+      });
+      const j = (await r.json().catch(() => ({}))) as { error?: string; time?: string; location?: string | null; ip?: string };
+      if (!r.ok || j.error) {
+        if (j.ip !== undefined) setNet((n) => (n ? { ...n, ip: j.ip ?? n.ip } : n));
+        throw new Error(j.error ?? "ลงเวลาไม่สำเร็จ");
+      }
+      setResult({ ok: true, time: j.time!, location: j.location ?? null, distance: null, extra: j.ip ? `เครือข่ายบริษัท (IP ${j.ip})` : undefined });
+      setPhoto(null);
+      if ("vibrate" in navigator) navigator.vibrate?.(60);
+      reload();
+    } catch (e) {
+      const msg = isNetworkError(e) ? "ติดต่อเซิร์ฟเวอร์ไม่ได้ — ตรวจสอบว่าเชื่อมต่อ Wi-Fi ของบริษัทแล้ว" : errText(e);
+      setResult({ ok: false, message: msg });
+      if (msg.includes("ถ่ายรูป")) fileRef.current?.click();
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const t = now ? bkkParts(now) : null;
   const isWorkDay = today && (today.day_type === "work" || today.day_type === "special");
 
@@ -250,11 +355,13 @@ export function CheckinScreen() {
 
       <div className="px-4">
         {/* Method switch */}
-        <div role="tablist" aria-label="วิธีลงเวลา" className="-mt-5 grid grid-cols-2 gap-1 rounded-[var(--radius-panel)] border border-line bg-white p-1 shadow-sm">
+        <div role="tablist" aria-label="วิธีลงเวลา" className="-mt-5 grid grid-cols-4 gap-1 rounded-[var(--radius-panel)] border border-line bg-white p-1 shadow-sm">
           {(
             [
               { v: "gps", label: "GPS", icon: LocateFixed },
               { v: "qr", label: "สแกน QR", icon: QrCode },
+              { v: "face", label: "สแกนใบหน้า", icon: ScanFace },
+              { v: "wifi", label: "Wi-Fi บริษัท", icon: Wifi },
             ] as const
           ).map((m) => (
             <button
@@ -264,16 +371,20 @@ export function CheckinScreen() {
               onClick={() => {
                 setMethod(m.v);
                 setResult(null);
+                if (m.v === "wifi") checkNetwork();
               }}
-              className={clsx("flex h-11 items-center justify-center gap-2 rounded-[calc(var(--radius-panel)-4px)] text-[15px] font-medium", method === m.v ? "bg-jade-600 text-white" : "text-ink-soft active:bg-jade-50")}
+              className={clsx(
+                "flex min-h-14 flex-col items-center justify-center gap-0.5 rounded-[calc(var(--radius-panel)-4px)] px-1 py-1.5 text-[13px] font-medium leading-tight",
+                method === m.v ? "bg-jade-600 text-white" : "text-ink-soft active:bg-jade-50",
+              )}
             >
-              <m.icon className="size-[18px]" /> {m.label}
+              <m.icon className="size-5" /> {m.label}
             </button>
           ))}
         </div>
 
         {/* Location status */}
-        {method === "gps" && (
+        {(method === "gps" || method === "face") && (
           <div className="mt-3 rounded-[var(--radius-panel)] border border-line bg-white px-4 py-3">
             {geo.error && !geo.fix ? (
               <div className="flex items-start gap-3">
@@ -331,6 +442,51 @@ export function CheckinScreen() {
           </div>
         )}
 
+        {method === "face" && (
+          <div className="mt-3">
+            <FaceCamera mode="liveness" aspectClass="aspect-square" paused={busy || (!geo.fix && !geo.error)} resetKey={faceReset} onCapture={submitFace} />
+            <p className="mt-2 text-sm text-ink-mute">
+              ระบบจะถ่ายรูปและลงเวลาให้อัตโนมัติเมื่อยืนยันใบหน้าได้ · ยังไม่ได้ลงทะเบียนใบหน้า? ติดต่อฝ่ายบุคคล
+            </p>
+            {result?.ok && (
+              <button className="mt-1 inline-flex h-9 items-center gap-1 rounded px-2 text-sm text-jade-700 active:bg-jade-50" onClick={() => (setResult(null), setFaceReset((n) => n + 1))}>
+                <RefreshCw className="size-3.5" /> สแกนอีกครั้ง
+              </button>
+            )}
+          </div>
+        )}
+
+        {method === "wifi" && (
+          <div className="mt-3 rounded-[var(--radius-panel)] border border-line bg-white px-4 py-3">
+            {!net || net.loading ? (
+              <div className="flex items-center gap-3 text-[15px] text-ink-soft">
+                <Wifi className="size-5 text-jade-600 motion-safe:animate-pulse" /> กำลังตรวจสอบเครือข่าย…
+              </div>
+            ) : net.locations.length ? (
+              <div className="flex items-center gap-3">
+                <span className="grid size-10 shrink-0 place-items-center rounded-full bg-jade-50 text-jade-700">
+                  <Wifi className="size-5" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="font-semibold text-jade-800">เชื่อมต่อเครือข่ายบริษัทแล้ว</div>
+                  <div className="truncate text-sm text-ink-soft">{net.locations[0].name}</div>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-start gap-3">
+                <TriangleAlert className="mt-0.5 size-5 shrink-0 text-amber-ink" />
+                <div className="flex-1 text-[15px] text-ink">{net.message ?? `เครื่องของคุณไม่ได้ต่อ Wi-Fi ของบริษัท (IP ${net.ip ?? "ไม่ทราบ"})`}</div>
+              </div>
+            )}
+            <div className="mt-2 flex items-center justify-between border-t border-line-soft pt-2 text-xs text-ink-mute">
+              <span className="num">{net?.ip ? `IP ของเครื่อง ${net.ip}` : "ตรวจจากเครือข่ายที่เครื่องเชื่อมต่ออยู่"}</span>
+              <button className="inline-flex h-8 items-center gap-1 rounded px-2 text-jade-700 active:bg-jade-50" onClick={checkNetwork}>
+                <RefreshCw className="size-3.5" /> ตรวจใหม่
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Direction */}
         <fieldset className="mt-3">
           <legend className="mb-1.5 text-sm text-ink-soft">ประเภทการลงเวลา</legend>
@@ -351,8 +507,8 @@ export function CheckinScreen() {
           </div>
         </fieldset>
 
-        {/* Photo */}
-        <div className="mt-3 flex items-center gap-3">
+        {/* Photo (face scan captures its own selfie) */}
+        <div className={clsx("mt-3 flex items-center gap-3", method === "face" && "hidden")}>
           <input ref={fileRef} type="file" accept="image/*" capture="user" className="sr-only" tabIndex={-1} aria-hidden onChange={(e) => takePhoto(e.target.files?.[0])} />
           {photo ? (
             <div className="relative">
@@ -375,6 +531,21 @@ export function CheckinScreen() {
           </button>
         </div>
 
+        {/* Primary action (Wi-Fi) */}
+        {method === "wifi" && (
+          <button
+            onClick={submitWifi}
+            disabled={busy || !net || net.loading || !net.locations.length || !online}
+            className={clsx(
+              "mt-4 flex h-[68px] w-full items-center justify-center gap-2.5 rounded-[var(--radius-panel)] text-[19px] font-semibold text-white shadow-sm transition-colors",
+              busy || !net?.locations.length || !online ? "bg-jade-300" : "bg-jade-600 active:bg-jade-800",
+            )}
+          >
+            {busy ? <Spinner className="size-6 text-white" /> : <Wifi className="size-6" />}
+            {busy ? "กำลังบันทึก…" : online ? actionLabel : "ออฟไลน์อยู่ — ลงเวลาด้วย Wi-Fi ไม่ได้"}
+          </button>
+        )}
+
         {/* Primary action (GPS) */}
         {method === "gps" && (
           <button
@@ -393,6 +564,7 @@ export function CheckinScreen() {
         {/* Result */}
         {result && (
           <div
+            ref={resultRef}
             role="status"
             className={clsx(
               "mt-3 rounded-[var(--radius-panel)] border px-4 py-3.5",
@@ -407,7 +579,9 @@ export function CheckinScreen() {
                     {result.offline ? "บันทึกไว้ในเครื่องแล้ว — รอซิงก์" : "ลงเวลาสำเร็จ"} <span className="num">{thTime(result.time)} น.</span>
                   </div>
                   <div className="text-sm text-ink-soft">
-                    {result.offline ? "ระบบจะส่งให้อัตโนมัติเมื่อกลับมาออนไลน์" : [result.location, result.distance != null ? `ห่าง ${fmtDistance(result.distance)}` : null].filter(Boolean).join(" · ")}
+                    {result.offline
+                      ? "ระบบจะส่งให้อัตโนมัติเมื่อกลับมาออนไลน์"
+                      : [result.location, result.distance != null ? `ห่าง ${fmtDistance(result.distance)}` : null, result.extra].filter(Boolean).join(" · ")}
                   </div>
                 </div>
               </div>

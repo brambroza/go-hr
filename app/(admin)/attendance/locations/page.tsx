@@ -4,7 +4,7 @@ import { refColumn, refField } from "@/components/attendance/ref-field";
 import { SafeCrudPage } from "@/components/attendance/safe-crud";
 import { useState } from "react";
 import QRCode from "qrcode";
-import { LocateFixed, MonitorSmartphone, Printer, QrCode, RefreshCw } from "lucide-react";
+import { LocateFixed, MonitorSmartphone, Network, Printer, QrCode, RefreshCw } from "lucide-react";
 import { type Row } from "@/components/crud/crud-page";
 import { useCan } from "@/components/app/me-context";
 import { Badge, Button, Input, Modal, toast, useConfirm } from "@/components/ui";
@@ -12,7 +12,7 @@ import { getQrSecretAction, regenerateQrSecretAction } from "@/lib/attendance/ac
 import { QrSvg } from "@/components/attendance/qr";
 import { invalidateAttLookups } from "@/components/attendance/lookups";
 
-const COLS = "id, name, branch_id, latitude, longitude, radius_m, wifi_ssids, wifi_bssids, beacon_uuids, allow_gps, allow_wifi, allow_beacon, allow_qr, require_photo, require_face, is_active, created_at, updated_at";
+const COLS = "id, name, branch_id, latitude, longitude, radius_m, wifi_ssids, wifi_bssids, beacon_uuids, allowed_ip_ranges, allow_gps, allow_wifi, allow_beacon, allow_qr, require_photo, require_face, is_active, created_at, updated_at";
 
 type LatLng = { lat: unknown; lng: unknown };
 
@@ -45,6 +45,52 @@ function LatLngPicker({ value, values, onChange }: { value: unknown; values: Rec
       <div className="flex flex-wrap items-center gap-3">
         <Button variant="subtle" size="sm" icon={<LocateFixed className="size-4" />} loading={busy} onClick={locate}>ใช้ตำแหน่งปัจจุบัน</Button>
         {has && <a className="text-sm text-jade-700 hover:underline" href={`https://maps.google.com/?q=${cur.lat},${cur.lng}`} target="_blank" rel="noreferrer">ดูบนแผนที่</a>}
+      </div>
+    </div>
+  );
+}
+
+/** "192.168.1.0/24" or "203.0.113.10" (→ /32). Returns null when valid, else a Thai error */
+function cidrError(list: unknown): string | null {
+  if (!Array.isArray(list)) return null;
+  for (const raw of list as string[]) {
+    const [ip, bits, ...rest] = String(raw).split("/");
+    const v4 = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(ip);
+    const v6 = !v4 && /^[0-9a-f:]+$/i.test(ip) && ip.includes(":");
+    const max = v4 ? 32 : 128;
+    const okBits = bits === undefined || (/^\d{1,3}$/.test(bits) && Number(bits) <= max);
+    if (rest.length || !(v4 ? v4.slice(1).every((x) => Number(x) <= 255) : v6) || !okBits) return `“${raw}” ไม่ใช่ IP หรือ CIDR ที่ถูกต้อง (เช่น 192.168.1.0/24)`;
+  }
+  return null;
+}
+
+function IpRangesInput({ value, onChange }: { value: unknown; onChange: (v: string[]) => void }) {
+  const [busy, setBusy] = useState(false);
+  const arr = Array.isArray(value) ? (value as string[]) : [];
+  const [text, setText] = useState(arr.join(", "));
+  const commit = (t: string) => onChange(t.split(/[,\s]+/).map((x) => x.trim()).filter(Boolean));
+  async function useMine() {
+    setBusy(true);
+    try {
+      const r = await fetch("/api/whoami-ip", { cache: "no-store" });
+      const j = (await r.json()) as { ip: string | null; cidr: string | null };
+      if (!j.cidr) return toast.error("ระบุ IP ของเครื่องนี้ไม่ได้");
+      if (arr.includes(j.cidr)) return toast.ok(`มี ${j.cidr} อยู่แล้ว`);
+      const next = [...arr, j.cidr];
+      setText(next.join(", "));
+      onChange(next);
+      toast.ok(`เพิ่ม ${j.cidr} แล้ว — ถ้าเป็นวง LAN ให้แก้เป็นทั้งวง เช่น 192.168.1.0/24`);
+    } catch {
+      toast.error("ติดต่อเซิร์ฟเวอร์ไม่ได้");
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <div className="flex flex-col gap-2">
+      <Input className="num" value={text} onChange={(e) => (setText(e.target.value), commit(e.target.value))} placeholder="เช่น 192.168.1.0/24, 203.0.113.10/32" />
+      <div>
+        <Button variant="subtle" size="sm" icon={<Network className="size-4" />} loading={busy} onClick={useMine}>ใช้ IP ปัจจุบันของฉัน</Button>
       </div>
     </div>
   );
@@ -119,6 +165,7 @@ export default function LocationsPage() {
                 <div className="flex flex-wrap gap-1">
                   {r.allow_gps ? <Badge color="green">GPS</Badge> : null}
                   {r.allow_wifi ? <Badge color="green">Wi-Fi{Array.isArray(r.wifi_ssids) && r.wifi_ssids.length ? ` (${r.wifi_ssids.length})` : ""}</Badge> : null}
+                  {r.allow_wifi && Array.isArray(r.allowed_ip_ranges) && r.allowed_ip_ranges.length ? <Badge color="green">เครือข่ายบริษัท</Badge> : null}
                   {r.allow_beacon ? <Badge color="green">Beacon</Badge> : null}
                   {r.allow_qr ? <Badge color="green">QR</Badge> : null}
                   {r.require_photo ? <Badge color="amber">ต้องถ่ายรูป</Badge> : null}
@@ -144,6 +191,16 @@ export default function LocationsPage() {
             { name: "allow_beacon", label: "ลงเวลาด้วย Beacon", type: "boolean", section: "Wi-Fi / Beacon" },
             { name: "wifi_ssids", label: "ชื่อ Wi-Fi (SSID)", type: "tags", section: "Wi-Fi / Beacon", placeholder: "เช่น OFFICE-STAFF, FACTORY-5G" },
             { name: "wifi_bssids", label: "MAC ของ Access Point (BSSID)", type: "tags", section: "Wi-Fi / Beacon", hint: "ปลอดภัยกว่า SSID เพราะปลอมยาก", placeholder: "aa:bb:cc:dd:ee:ff" },
+            {
+              name: "allowed_ip_ranges",
+              label: "เครือข่ายของบริษัท (IP / CIDR)",
+              type: "custom",
+              span: 2,
+              section: "Wi-Fi / Beacon",
+              hint: "สำหรับเมนู ‘Wi-Fi บริษัท’ ในแอปพนักงาน (เบราว์เซอร์อ่านชื่อ Wi-Fi ไม่ได้ จึงตรวจจาก IP) — ติดตั้งในวง LAN ใส่วง IP ภายใน เช่น 192.168.1.0/24; เข้าผ่านอินเทอร์เน็ตใส่ IP สาธารณะ (Fixed IP) ของสำนักงาน",
+              validate: (v) => cidrError(v),
+              render: ({ value, onChange }) => <IpRangesInput value={value} onChange={onChange} />,
+            },
             { name: "beacon_uuids", label: "Beacon UUID", type: "tags", span: 2, section: "Wi-Fi / Beacon" },
 
             { name: "allow_qr", label: "ลงเวลาด้วย QR Code", type: "boolean", section: "QR และการยืนยันตัวตน" },

@@ -70,11 +70,17 @@ Supervisors (anyone with subordinates) see their team even without HR permission
 - Dates are shown in พ.ศ. via `thDate()`; store ISO `YYYY-MM-DD`. Times are Asia/Bangkok.
 - Simple master tables: use `CrudPage` (see `app/(admin)/org/branches/page.tsx`).
 
-## Local dev environment (already running in the dev container)
+## Local dev environment
+
+On a developer machine use the Supabase CLI (`npx supabase start`, see README). The notes below describe the
+lightweight stack used while building GO HR in a container without Docker:
 
 - Postgres 16 `127.0.0.1:54322` db `hr` (user postgres, trust), GoTrue :9999, PostgREST :3001,
   gateway `http://localhost:54321` (`/auth/v1`, `/rest/v1`, `/storage/v1` → local file store).
 - Next dev server `http://localhost:3000` (already running; hot reloads — do not start another one).
+- Runtime config: the browser gets the Supabase URL/anon key from `window.__GOHR_ENV` (lib/public-env.ts) — use
+  `PUBLIC_SUPABASE_URL` / `SUPABASE_ANON_KEY` / `SUPABASE_URL` (server) instead of `NEXT_PUBLIC_*` so one Docker image fits every customer.
+- Scripts that import server modules: `npx tsx --tsconfig scripts/tsconfig.json scripts/<file>.ts` (shims `server-only`).
 - Apply a new migration: `psql -h 127.0.0.1 -p 54322 -U postgres -d hr -v ON_ERROR_STOP=1 -f <file>`
   (write migrations idempotently: `create or replace`, `if not exists`, `drop policy if exists`).
   PostgREST caches the schema: after DDL run `psql -h 127.0.0.1 -p 54322 -U postgres -d hr -c "notify pgrst, 'reload schema'"`.

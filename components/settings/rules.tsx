@@ -8,13 +8,13 @@ import { useSetting } from "./use-setting";
 
 // ---------------------------------------------------------------- types & defaults (mirror supabase/seed.sql)
 type Att = {
-  allow_outside_area: boolean; face_threshold: number; allow_self_schedule: boolean; absent_if_no_scan: boolean; single_scan_policy: string;
+  allow_outside_area: boolean; face_threshold: number; face_max_distance: number; allow_self_face_enroll: boolean; allow_self_schedule: boolean; absent_if_no_scan: boolean; single_scan_policy: string;
   auto_ot_without_request: boolean; ot_rates: { workday: number; holiday_monthly: number; holiday_daily: number; holiday_ot: number };
   late_policy: { mode: string; free_times_per_month: number; round_to_minutes?: number };
   diligence: { enabled: boolean; pay_item_code: string; steps: number[]; reset_on: string[] };
 };
 const ATT: Att = {
-  allow_outside_area: false, face_threshold: 0.55, allow_self_schedule: false, absent_if_no_scan: true, single_scan_policy: "missing", auto_ot_without_request: false,
+  allow_outside_area: false, face_threshold: 0.55, face_max_distance: 0.5, allow_self_face_enroll: false, allow_self_schedule: false, absent_if_no_scan: true, single_scan_policy: "missing", auto_ot_without_request: false,
   ot_rates: { workday: 1.5, holiday_monthly: 1, holiday_daily: 2, holiday_ot: 3 },
   late_policy: { mode: "deduct_minutes", free_times_per_month: 0 },
   diligence: { enabled: false, pay_item_code: "DILIGENCE", steps: [500, 600, 700], reset_on: ["late", "absent", "leave_unpaid"] },
@@ -138,7 +138,7 @@ function AttendanceTab() {
   const submit = () => {
     const r = v.ot_rates;
     let e: string | null = null;
-    if (!(v.face_threshold > 0 && v.face_threshold < 1)) e = "ค่าความเหมือนใบหน้าต้องอยู่ระหว่าง 0 ถึง 1";
+    if (!(v.face_max_distance >= 0.3 && v.face_max_distance <= 0.7)) e = "ระยะห่างใบหน้าสูงสุดต้องอยู่ระหว่าง 0.30 ถึง 0.70";
     else if ([r.workday, r.holiday_monthly, r.holiday_daily, r.holiday_ot].some((x) => !(x >= 0 && x <= 10))) e = "อัตรา OT ต้องอยู่ระหว่าง 0-10 เท่า";
     else if (r.workday < 1.5 || r.holiday_ot < 3) e = "อัตรา OT ต่ำกว่าที่กฎหมายกำหนด (วันทำงาน ≥ 1.5 เท่า, OT วันหยุด ≥ 3 เท่า)";
     else if (v.diligence.enabled && (!v.diligence.steps.length || v.diligence.steps.some((x) => !(x > 0)))) e = "กรอกจำนวนเงินเบี้ยขยันแต่ละขั้นให้ถูกต้อง";
@@ -150,7 +150,8 @@ function AttendanceTab() {
       <fieldset disabled={ro} className="contents">
         <Panel title="การลงเวลา">
           <Row label="อนุญาตให้ลงเวลานอกพื้นที่" hint="บันทึกได้แต่จะถูกทำเครื่องหมายว่าอยู่นอกพื้นที่"><Toggle checked={v.allow_outside_area} onChange={(x) => set({ allow_outside_area: x })} /></Row>
-          <Row label="ค่าความเหมือนใบหน้าขั้นต่ำ" hint="0.40 = ยอมรับง่าย · 0.70 = เข้มงวด (แนะนำ 0.55)"><Num value={v.face_threshold} step="0.01" min={0.3} max={0.95} onChange={(x) => set({ face_threshold: x })} /></Row>
+          <Row label="ความเข้มงวดของการสแกนใบหน้า" hint="ระยะห่างสูงสุดที่ยอมรับ — น้อย = เข้มงวด · 0.40 เข้มงวด, 0.50 แนะนำ, 0.60 ยอมรับง่าย (เสี่ยงจำผิดคน)"><Num value={v.face_max_distance} step="0.01" min={0.3} max={0.7} onChange={(x) => set({ face_max_distance: x })} /></Row>
+          <Row label="พนักงานลงทะเบียนใบหน้าเองได้" hint="เปิด = พนักงานเพิ่มตัวอย่างใบหน้าในแอป (เมนูข้อมูลของฉัน) ได้ · ปิด = ฝ่ายบุคคลลงทะเบียนให้เท่านั้น"><Toggle checked={v.allow_self_face_enroll} onChange={(x) => set({ allow_self_face_enroll: x })} /></Row>
           <Row label="พนักงานเลือกกะ/ตารางงานเองได้"><Toggle checked={v.allow_self_schedule} onChange={(x) => set({ allow_self_schedule: x })} /></Row>
           <Row label="ไม่สแกนทั้งวัน ถือว่าขาดงาน" hint="ปิด = ถือว่ามาทำงาน (เหมาะกับพนักงานที่ไม่ต้องลงเวลา)"><Toggle checked={v.absent_if_no_scan} onChange={(x) => set({ absent_if_no_scan: x })} /></Row>
           <Row label="สแกนครั้งเดียวในวัน">
