@@ -223,6 +223,7 @@ export function computeEntry(input: EmployeePayInput): EntryResult {
   }
 
   // ---- attendance-based ---------------------------------------------------------
+  let diligenceStep: number | null = null;
   if (period.include_attendance) {
     if (priv.salary_unit === "month") {
       if (cfg.deduct_absent && att.absent_days > 0) push(items.absent, daily * att.absent_days, { qty: att.absent_days, rate: daily });
@@ -240,6 +241,7 @@ export function computeEntry(input: EmployeePayInput): EntryResult {
     if (input.diligence?.enabled && input.diligence.item && input.diligence.steps.length) {
       const eligible = att.late_count === 0 && att.absent_days === 0 && att.unpaid_leave_days === 0;
       const step = eligible ? Math.min(input.diligence.prevStep + 1, input.diligence.steps.length) : 0;
+      diligenceStep = step;
       if (step > 0) push(input.diligence.item, input.diligence.steps[step - 1], { qty: step, name: `${input.diligence.item.name} (ขั้น ${step})` });
     }
   }
@@ -348,7 +350,7 @@ export function computeEntry(input: EmployeePayInput): EntryResult {
     ytd_sso: r2(input.ytd.sso + input.monthPrev.sso_employee + ssoEmp),
     ytd_pvd: r2(input.ytd.pvd + pvdEmp),
     rates: { daily: r2(daily), hourly: r2(hourly) },
-    detail: { tax: taxDetail, regular_taxable: r2(regularTaxable), irregular_taxable: r2(irregularTaxable), pvd_base: r2(pvdBase) },
+    detail: { tax: taxDetail, regular_taxable: r2(regularTaxable), irregular_taxable: r2(irregularTaxable), pvd_base: r2(pvdBase), diligence_step: diligenceStep },
     warnings,
   };
 }

@@ -157,8 +157,8 @@ export function CrudPage({ config }: { config: CrudConfig }) {
       let payload = cleanValues(config.fields, values);
       if (config.beforeSave) payload = await config.beforeSave(payload, editing);
       const res = editing
-        ? await sb.from(config.table).update(payload).eq(idKey, editing[idKey]).select().single()
-        : await sb.from(config.table).insert(payload).select().single();
+        ? await sb.from(config.table).update(payload).eq(idKey, editing[idKey]).select(config.select ?? "*").single()
+        : await sb.from(config.table).insert(payload).select(config.select ?? "*").single();
       if (res.error) throw res.error;
       await config.afterSave?.(res.data as Row);
       toast.ok(editing ? "บันทึกการแก้ไขแล้ว" : "เพิ่มข้อมูลแล้ว");
@@ -225,7 +225,7 @@ export function CrudPage({ config }: { config: CrudConfig }) {
       {filterOptions.map((f) => (
         <Select
           key={f.name}
-          className="h-9 w-auto min-w-36 text-sm"
+          className="h-9 !w-auto min-w-36 text-sm"
           value={filters[f.name] ?? ""}
           placeholder={`${f.label}: ทั้งหมด`}
           onChange={(e) => {

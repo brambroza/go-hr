@@ -39,6 +39,8 @@ export interface FieldDef {
   validate?: (v: unknown, values: Record<string, unknown>) => string | null;
   render?: (props: { value: unknown; onChange: (v: unknown) => void; values: Record<string, unknown> }) => ReactNode;
   section?: string;
+  /** for self-referencing refs (e.g. parent unit): hide the row being edited from its own options */
+  excludeSelf?: boolean;
 }
 
 export type RefOptions = Record<string, { value: string | number; label: string; raw?: Record<string, unknown> }[]>;
@@ -219,7 +221,7 @@ function FieldInput({
     case "ref":
       input = (
         <Select value={str} onChange={(e) => set(e.target.value)} placeholder={f.required ? "— เลือก —" : "— ไม่ระบุ —"} disabled={readOnly}>
-          {opts?.filter((o) => String(o.value) !== String(values.id ?? "__")).map((o) => (
+          {opts?.filter((o) => !f.excludeSelf || String(o.value) !== String(values.id ?? "__")).map((o) => (
             <option key={o.value} value={o.value}>{o.label}</option>
           ))}
         </Select>

@@ -24,18 +24,16 @@ export function BarList({ data, valueFormat = (v: number) => v.toLocaleString("t
 
 export function Donut({ data, size = 140 }: { data: { name: string; value: number }[]; size?: number }) {
   const total = data.reduce((s, d) => s + d.value, 0) || 1;
-  let acc = 0;
   const r = 52;
   const c = 2 * Math.PI * r;
+  const offsets = data.reduce<number[]>((a, d, i) => [...a, i === 0 ? 0 : a[i - 1] + (data[i - 1].value / total) * c], []);
   return (
     <div className="flex items-center gap-4">
       <svg viewBox="0 0 120 120" width={size} height={size} className="shrink-0 -rotate-90">
         <circle cx="60" cy="60" r={r} fill="none" stroke="#e9eeeb" strokeWidth="14" />
         {data.map((d, i) => {
           const len = (d.value / total) * c;
-          const el = <circle key={d.name} cx="60" cy="60" r={r} fill="none" stroke={PALETTE[i % PALETTE.length]} strokeWidth="14" strokeDasharray={`${len} ${c - len}`} strokeDashoffset={-acc} />;
-          acc += len;
-          return el;
+          return <circle key={d.name} cx="60" cy="60" r={r} fill="none" stroke={PALETTE[i % PALETTE.length]} strokeWidth="14" strokeDasharray={`${len} ${c - len}`} strokeDashoffset={-offsets[i]} />;
         })}
       </svg>
       <ul className="flex flex-col gap-1 text-sm">
