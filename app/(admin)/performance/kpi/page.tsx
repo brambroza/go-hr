@@ -94,6 +94,7 @@ function Profiles() {
     if (!(await confirm(`ลบ KPI Profile “${p.name}” ใช่หรือไม่?`, { danger: true, confirmText: "ลบ" }))) return;
     const { error } = await sb.from("kpi_profiles").delete().eq("id", p.id);
     if (error) return toast.error(humanError(error));
+    toast.ok("ลบ KPI Profile แล้ว");
     load();
   }
 

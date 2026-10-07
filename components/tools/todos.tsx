@@ -8,7 +8,7 @@ import { supabaseBrowser } from "@/lib/supabase/client";
 import { useCan, useMe } from "@/components/app/me-context";
 import { EmployeePicker, type EmpOption } from "@/components/crud/employee-picker";
 import { Avatar } from "@/components/employees/avatar";
-import { Badge, Button, Empty, Field, Input, Modal, Select, Spinner, Tabs, Textarea, clsx, toast, useConfirm } from "@/components/ui";
+import { Badge, Button, Empty, Field, Input, Modal, Select, Spinner, Tabs, Textarea, clsx, errorText, toast, useConfirm } from "@/components/ui";
 import { isoDate, thDate } from "@/lib/format";
 
 type Status = "todo" | "doing" | "done" | "cancelled";
@@ -111,9 +111,9 @@ export function Todos({ variant = "desktop" }: { variant?: "desktop" | "mobile" 
     setRows((l) => l?.map((x) => (x.id === t.id ? { ...x, status } : x)) ?? null);
     const { error } = await sb.from("todos").update({ status }).eq("id", t.id);
     if (error) {
-      toast.error(`เปลี่ยนสถานะไม่ได้: ${error.message}`);
+      toast.error(`เปลี่ยนสถานะไม่ได้: ${errorText(error)}`);
       load();
-    }
+    } else toast.ok(`ย้ายไป “${COLS.find((c) => c.key === status)?.label ?? "ยกเลิก"}” แล้ว`);
   };
 
   const toggleCheck = async (t: Todo, i: number) => {
@@ -126,7 +126,8 @@ export function Todos({ variant = "desktop" }: { variant?: "desktop" | "mobile" 
   const remove = async (t: Todo) => {
     if (!(await confirm(`ลบงาน "${t.title}"?`, { danger: true, confirmText: "ลบงาน" }))) return;
     const { error } = await sb.from("todos").delete().eq("id", t.id);
-    if (error) return toast.error(`ลบไม่ได้: ${error.message}`);
+    if (error) return toast.error(`ลบไม่ได้: ${errorText(error)}`);
+    toast.ok("ลบงานแล้ว");
     setEditing(null);
     load();
   };

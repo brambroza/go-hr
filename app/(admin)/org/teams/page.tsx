@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Trash2, UserPlus, Users } from "lucide-react";
 import { CrudPage, humanError } from "@/components/crud/crud-page";
 import { EmployeePicker, type EmpOption } from "@/components/crud/employee-picker";
-import { Badge, Button, Empty, Input, Modal, Spinner, toast } from "@/components/ui";
+import { Badge, Button, Empty, Input, Modal, Spinner, toast, useConfirm } from "@/components/ui";
 import { Avatar } from "@/components/employees/avatar";
 import { supabaseBrowser } from "@/lib/supabase/client";
 import { useCan } from "@/components/app/me-context";
@@ -53,7 +53,8 @@ export default function TeamsPage() {
           afterSave: async (row) => {
             // leader is always a member of the team
             if (row.leader_employee_id) {
-              await supabaseBrowser().from("team_members").upsert({ team_id: row.id, employee_id: row.leader_employee_id, role: "หัวหน้าทีม" }, { onConflict: "team_id,employee_id", ignoreDuplicates: true });
+              const { error } = await supabaseBrowser().from("team_members").upsert({ team_id: row.id, employee_id: row.leader_employee_id, role: "หัวหน้าทีม" }, { onConflict: "team_id,employee_id", ignoreDuplicates: true });
+              if (error) toast.error("บันทึกทีมแล้ว แต่เพิ่มหัวหน้าทีมเป็นสมาชิกไม่สำเร็จ: " + humanError(error));
               loadCounts();
             }
           },
@@ -79,6 +80,7 @@ function MembersModal({ team, onClose }: { team: Team | null; onClose: () => voi
   const [pick, setPick] = useState<number | null>(null);
   const [role, setRole] = useState("");
   const [busy, setBusy] = useState(false);
+  const { confirm, dialog } = useConfirm();
   const sb = supabaseBrowser();
 
   const load = useCallback(async () => {
@@ -106,6 +108,7 @@ function MembersModal({ team, onClose }: { team: Team | null; onClose: () => voi
     const { error } = await sb.from("team_members").insert({ team_id: team.id, employee_id: pick, role: role.trim() || null });
     setBusy(false);
     if (error) return toast.error(humanError(error));
+    toast.ok("เพิ่มสมาชิกแล้ว");
     setPick(null);
     setRole("");
     load();
@@ -113,8 +116,10 @@ function MembersModal({ team, onClose }: { team: Team | null; onClose: () => voi
   async function remove(id: number) {
     if (!team) return;
     if (id === team.leader_employee_id) return toast.error("นำหัวหน้าทีมออกไม่ได้ เปลี่ยนหัวหน้าทีมก่อน");
+    if (!(await confirm("นำพนักงานคนนี้ออกจากทีมใช่หรือไม่?", { danger: true, confirmText: "นำออก" }))) return;
     const { error } = await sb.from("team_members").delete().eq("team_id", team.id).eq("employee_id", id);
     if (error) return toast.error(humanError(error));
+    toast.ok("นำออกจากทีมแล้ว");
     load();
   }
 
@@ -158,6 +163,7 @@ function MembersModal({ team, onClose }: { team: Team | null; onClose: () => voi
           })}
         </ul>
       )}
+      {dialog}
     </Modal>
   );
 }

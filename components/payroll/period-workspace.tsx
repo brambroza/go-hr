@@ -3,19 +3,19 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { AlertTriangle, ArrowLeft, Banknote, Calculator, Check, CheckCheck, Download, FileSpreadsheet, Lock, Printer, Search, Send, Trash2, Undo2 } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Banknote, Calculator, Check, CheckCheck, Download, FileCog, FileSpreadsheet, Lock, Printer, Search, Send, Trash2, Undo2 } from "lucide-react";
 import { supabaseBrowser } from "@/lib/supabase/client";
 import { useCan } from "@/components/app/me-context";
-import { Badge, Button, Empty, Input, Modal, PageHeader, Panel, Select, Spinner, Stat, Tabs, clsx, toast, useConfirm } from "@/components/ui";
+import { Badge, Button, Empty, Input, PageHeader, Panel, Select, Spinner, Stat, Tabs, clsx, toast, useConfirm } from "@/components/ui";
 import { money, thDate, thDateTime } from "@/lib/format";
-import { BANK_FORMATS } from "@/lib/payroll/files";
 import { PERIOD_TYPE_LABEL, STATUS_COLOR, STATUS_STEPS, STATUS_TEXT, UNIT_LABEL, sumBy } from "@/lib/payroll/labels";
 import { fetchRows } from "@/lib/payroll/fetch";
 import { calculateAction, workflowAction } from "@/app/(admin)/payroll/actions";
 import { EntryDetailModal } from "./entry-detail";
 import { AdjustmentsTab } from "./adjustments-tab";
 import { CommissionsTab } from "./commissions-tab";
-import { exportBankFile, exportCashList, exportRegister } from "./exports";
+import { exportCashList, exportRegister } from "./exports";
+import { BankFileModal } from "./bank-file-modal";
 import { ENTRY_COLS, type Entry, type PeriodFull } from "./types";
 
 type Tab = "entries" | "adjustments" | "commissions";
@@ -35,7 +35,6 @@ export function PeriodWorkspace({ id }: { id: number }) {
   const [filter, setFilter] = useState({ org: "", branch: "", unit: "", pay: "", warn: false });
   const [detail, setDetail] = useState<Entry | null>(null);
   const [bankOpen, setBankOpen] = useState(false);
-  const [bankFmt, setBankFmt] = useState("generic");
   const [dirty, setDirty] = useState(false);
 
   const load = useCallback(async () => {
@@ -51,10 +50,6 @@ export function PeriodWorkspace({ id }: { id: number }) {
     load().catch((e) => toast.error(String(e?.message ?? e)));
     sb.from("org_units").select("id, name").then(({ data }: { data: unknown }) => setOrgs(new Map(((data as { id: number; name: string }[]) ?? []).map((o) => [o.id, o.name]))));
     sb.from("branches").select("id, name").order("code").then(({ data }: { data: unknown }) => setBranches((data as { id: number; name: string }[]) ?? []));
-    sb.from("settings").select("value").eq("key", "payroll").maybeSingle().then(({ data }: { data: unknown }) => {
-      const f = ((data as { value?: Record<string, unknown> } | null)?.value)?.bank_file_format;
-      if (typeof f === "string" && BANK_FORMATS.some((x) => x.key === f)) setBankFmt(f);
-    });
   }, [load, sb]);
 
   const filtered = useMemo(() => {
@@ -269,6 +264,11 @@ export function PeriodWorkspace({ id }: { id: number }) {
                     </Button>
                   </>
                 )}
+                {can("payroll", "export") && (
+                  <Link href="/settings/file-formats" className="inline-flex h-8 items-center gap-1.5 rounded-[var(--radius-ctl)] border border-line bg-white px-2.5 text-sm font-medium hover:bg-jade-50">
+                    <FileCog className="size-4" /> รูปแบบไฟล์
+                  </Link>
+                )}
                 <Link href={`/payroll/${id}/payslips`} target="_blank" className="inline-flex h-8 items-center gap-1.5 rounded-[var(--radius-ctl)] border border-line bg-white px-2.5 text-sm font-medium hover:bg-jade-50">
                   <Printer className="size-4" /> พิมพ์สลิปทั้งหมด
                 </Link>
@@ -359,46 +359,7 @@ export function PeriodWorkspace({ id }: { id: number }) {
       )}
 
       <EntryDetailModal entry={detail} onClose={() => setDetail(null)} />
-      <Modal
-        open={bankOpen}
-        onClose={() => setBankOpen(false)}
-        title="ไฟล์โอนเงินเดือนเข้าธนาคาร"
-        footer={
-          <>
-            <Button variant="secondary" onClick={() => setBankOpen(false)}>
-              ยกเลิก
-            </Button>
-            <Button
-              icon={<Download className="size-4" />}
-              onClick={async () => {
-                try {
-                  const r = await exportBankFile(bankFmt, period, all);
-                  toast.ok(`สร้างไฟล์ ${r.count} รายการ ยอดรวม ${money(r.total)} บาท${r.missing ? ` · ไม่มีเลขบัญชี ${r.missing} คน` : ""}`);
-                  setBankOpen(false);
-                } catch (e) {
-                  toast.error(e instanceof Error ? e.message : String(e));
-                }
-              }}
-            >
-              ดาวน์โหลด
-            </Button>
-          </>
-        }
-      >
-        <p className="mb-3 text-sm text-ink-soft">รวมเฉพาะพนักงานที่รับเงินผ่านธนาคารและมียอดสุทธิมากกว่า 0 ({all.filter((e) => e.pay_method === "bank" && Number(e.net_pay) > 0).length} คน)</p>
-        <div className="flex flex-col gap-2">
-          {BANK_FORMATS.map((f) => (
-            <label key={f.key} className={clsx("flex cursor-pointer gap-3 rounded-[var(--radius-ctl)] border px-3 py-2.5", bankFmt === f.key ? "border-jade-500 bg-jade-50" : "border-line")}>
-              <input type="radio" className="mt-1 accent-jade-600" checked={bankFmt === f.key} onChange={() => setBankFmt(f.key)} />
-              <span>
-                <span className="font-medium">{f.label}</span>
-                <span className="block text-xs text-ink-mute">{f.description}</span>
-              </span>
-            </label>
-          ))}
-        </div>
-        <p className="mt-3 text-xs text-ink-mute">บัญชีบริษัทและรหัสบริษัทตั้งค่าได้ที่ ตั้งค่าเวลา / เงินเดือน / ภาษี (payroll.company_bank) · ตรวจรูปแบบไฟล์กับธนาคารก่อนใช้งานจริงครั้งแรก</p>
-      </Modal>
+      {bankOpen && <BankFileModal open={bankOpen} onClose={() => setBankOpen(false)} period={period} entries={all} />}
       {dialog}
     </div>
   );

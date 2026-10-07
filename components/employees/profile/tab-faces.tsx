@@ -15,7 +15,7 @@ import type { TabProps } from "./types";
 
 const FaceCamera = dynamic(() => import("@/components/ess/face-scan").then((m) => m.FaceCamera), {
   ssr: false,
-  loading: () => <div className="grid aspect-[4/5] w-full place-items-center rounded-[var(--radius-panel)] bg-jade-950 text-sm text-jade-100">กำลังโหลดระบบสแกนใบหน้า…</div>,
+  loading: () => <div className="grid aspect-[4/5] w-full place-items-center rounded-[var(--radius-panel)] border border-line bg-paper text-sm text-ink-soft">กำลังโหลดระบบสแกนใบหน้า…</div>,
 });
 
 export const MAX_FACE_SAMPLES = 5;

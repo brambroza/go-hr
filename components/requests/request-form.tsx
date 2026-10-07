@@ -10,7 +10,7 @@
 
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Banknote, CalendarClock, CalendarRange, Clock, FileBadge, FileText, HeartHandshake, LogOut, MessageSquareWarning, Plane, Plus, Receipt, Repeat, Timer, Trash2, Wallet } from "lucide-react";
-import { Button, Checkbox, clsx, Field, Input, Select, Spinner, Textarea, toast } from "@/components/ui";
+import { Button, Checkbox, clsx, Field, Input, Select, Spinner, Textarea, errorText, toast } from "@/components/ui";
 import { AttachmentsField, type Attachment } from "@/components/org/attachments-field";
 import { supabaseBrowser } from "@/lib/supabase/client";
 import { isoDate, money, thMonthYear } from "@/lib/format";
@@ -255,7 +255,9 @@ export function RequestForm({ employeeId, defaultType, onSubmitted }: RequestFor
     const { data, error } = await supabaseBrowser().rpc("submit_request", args);
     setBusy(false);
     if (error) {
-      setError(error.message);
+      const msg = errorText(error);
+      setError(msg);
+      toast.error(`ส่งไม่สำเร็จ: ${msg}`);
       return;
     }
     const r = data as { id: number; doc_no: string; status: string };

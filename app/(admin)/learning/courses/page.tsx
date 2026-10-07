@@ -44,6 +44,7 @@ export default function CoursesPage() {
     const { data, error } = await sb.from("courses").insert({ title: title.trim() }).select("id").single();
     setBusy(false);
     if (error) return toast.error(humanError(error));
+    toast.ok("สร้างหลักสูตรแล้ว");
     router.push(`/learning/courses/${data.id}`);
   }
 
@@ -66,12 +67,12 @@ export default function CoursesPage() {
             return (
               <li key={c.id}>
                 <button onClick={() => router.push(`/learning/courses/${c.id}`)} className="group flex h-full w-full flex-col overflow-hidden rounded-[var(--radius-panel)] border border-line bg-white text-left hover:border-jade-300">
-                  <div className="relative aspect-[16/7] w-full bg-jade-800">
+                  <div className="relative aspect-[16/7] w-full bg-gradient-to-br from-jade-50 to-jade-100/60">
                     {c.cover_url ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={c.cover_url} alt="" className="h-full w-full object-cover" />
                     ) : (
-                      <div className="grid h-full place-items-center text-jade-300"><BookOpen className="size-10" /></div>
+                      <div className="grid h-full place-items-center text-jade-500"><BookOpen className="size-10" /></div>
                     )}
                     <div className="absolute left-2 top-2 flex gap-1">
                       {c.is_published ? <Badge color="green">เผยแพร่แล้ว</Badge> : <Badge>ร่าง</Badge>}

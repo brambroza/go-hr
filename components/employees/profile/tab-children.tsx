@@ -483,6 +483,7 @@ function SingleFile({ value, onChange, folder }: { value: string | null; onChang
     try {
       const r = await uploadFile("documents", f, { folder });
       onChange(r.url);
+      toast.ok("อัปโหลดไฟล์แล้ว กด “บันทึก” เพื่อยืนยัน");
     } catch (e) {
       toast.error(`อัปโหลดไม่สำเร็จ: ${e instanceof Error ? e.message : String(e)}`);
     } finally {

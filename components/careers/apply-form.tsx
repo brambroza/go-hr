@@ -3,7 +3,7 @@
 import { useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { CheckCircle2, FileUp, Loader2, ShieldCheck } from "lucide-react";
-import { clsx } from "@/components/ui";
+import { clsx, toast } from "@/components/ui";
 import { EDU_LEVELS, type JobQuestion } from "@/components/recruit/labels";
 
 const inputCls =
@@ -61,12 +61,15 @@ export function ApplyForm({ slug, title, questions, consentText, companyName }: 
       const j = (await res.json().catch(() => ({}))) as { ok?: boolean; ref_no?: string; error?: string; field?: string };
       if (!res.ok || !j.ok) {
         setError({ msg: j.error ?? "ส่งใบสมัครไม่สำเร็จ กรุณาลองใหม่", field: j.field });
+        toast.error(j.error ?? "ส่งใบสมัครไม่สำเร็จ กรุณาลองใหม่");
         return;
       }
+      toast.ok("ส่งใบสมัครแล้ว");
       setDone(j.ref_no ?? "");
       setTimeout(() => document.getElementById("apply")?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
     } catch {
       setError({ msg: "เชื่อมต่อไม่ได้ กรุณาตรวจสอบอินเทอร์เน็ตแล้วลองใหม่" });
+      toast.error("เชื่อมต่อไม่ได้ กรุณาตรวจสอบอินเทอร์เน็ตแล้วลองใหม่");
     } finally {
       setBusy(false);
     }

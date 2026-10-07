@@ -130,8 +130,10 @@ export function FlowEditor() {
   }
 
   async function toggleActive(f: Flow) {
+    if (f.is_active && !(await confirm(<>ปิดใช้งานลำดับอนุมัติ “{f.name}”? เอกสารที่ยื่นหลังจากนี้จะใช้ลำดับอื่นที่ตรงเงื่อนไขแทน</>, { confirmText: "ปิดใช้งาน" }))) return;
     const { error } = await sb.from("approval_flows").update({ is_active: !f.is_active }).eq("id", f.id);
     if (error) return toast.error(errMsg(error));
+    toast.ok(f.is_active ? "ปิดใช้งานลำดับอนุมัติแล้ว" : "เปิดใช้งานลำดับอนุมัติแล้ว");
     load();
   }
 

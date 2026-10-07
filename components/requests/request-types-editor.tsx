@@ -56,7 +56,10 @@ export function RequestTypesEditor() {
     if (error) {
       toast.error(errMsg(error));
       load();
-    } else loadReqLookups(true);
+    } else {
+      toast.ok("บันทึกการตั้งค่าแล้ว");
+      loadReqLookups(true);
+    }
   }
 
   async function save() {

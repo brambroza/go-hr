@@ -32,7 +32,7 @@ async function main() {
     return;
   }
 
-  await sb.from("settings").update({ value: { name: "บริษัท โกอะลอง แมนูแฟคเจอริ่ง จำกัด", name_en: "GO Along Manufacturing Co., Ltd.", tax_id: "0115560012345", branch_no: "00000", address: "99/9 หมู่ 5 ถ.เทพารักษ์ ต.บางเสาธง อ.บางเสาธง จ.สมุทรปราการ 10570", phone: "02-123-4567", email: "hr@example.co.th", primary_color: "#1b6f53" } }).eq("key", "company");
+  await sb.from("settings").update({ value: { name: "บริษัท โกอะลอง แมนูแฟคเจอริ่ง จำกัด", name_en: "GO Along Manufacturing Co., Ltd.", tax_id: "0115560012342", branch_no: "00000", address: "99/9 หมู่ 5 ถ.เทพารักษ์ ต.บางเสาธง อ.บางเสาธง จ.สมุทรปราการ 10570", phone: "02-123-4567", email: "hr@example.co.th", primary_color: "#10b981" } }).eq("key", "company");
 
   const [hq, br2] = must(await sb.from("branches").insert([
     { code: "HQ", name: "สำนักงานใหญ่ บางเสาธง", is_head_office: true, tax_branch_no: "00000", sso_account_no: "1000123456", sso_branch_no: "000000", address: "99/9 หมู่ 5 ถ.เทพารักษ์ ต.บางเสาธง อ.บางเสาธง จ.สมุทรปราการ 10570" },

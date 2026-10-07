@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Check, Circle, Eye, EyeOff, LogOut } from "lucide-react";
-import { Button, Field, Input, clsx } from "@/components/ui";
+import { Button, Field, Input, clsx, toast } from "@/components/ui";
 import { supabaseBrowser } from "@/lib/supabase/client";
 import { checkPassword, type PasswordPolicy } from "@/lib/employees/password";
 
@@ -56,6 +56,7 @@ export function ChangePasswordForm({ first, policy, name, email }: { first: bool
     setLoading(false);
     if (rpcErr) return setError(`เปลี่ยนรหัสผ่านแล้ว แต่บันทึกสถานะไม่สำเร็จ: ${rpcErr.message}`);
     setDone(true);
+    toast.ok("เปลี่ยนรหัสผ่านแล้ว");
     router.replace("/");
     router.refresh();
   }

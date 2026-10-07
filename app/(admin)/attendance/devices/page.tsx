@@ -39,6 +39,7 @@ export default function DevicesPage() {
   const [keyFor, setKeyFor] = useState<{ row: Row; key: string } | null>(null);
   const [mapFor, setMapFor] = useState<Row | null>(null);
   const { confirm, dialog } = useConfirm();
+  const [regenBusy, setRegenBusy] = useState(false);
   const origin = typeof window !== "undefined" ? window.location.origin : "";
 
   async function showKey(row: Row) {
@@ -49,8 +50,9 @@ export default function DevicesPage() {
   async function regen() {
     if (!keyFor) return;
     if (!(await confirm("สร้าง API key ใหม่? เครื่องที่ใช้ key เดิมจะส่งข้อมูลไม่ได้จนกว่าจะตั้งค่า key ใหม่", { danger: true, confirmText: "สร้างใหม่" }))) return;
-    const r = await regenerateDeviceKeyAction(Number(keyFor.row.id));
-    if (!r.ok) return toast.error(r.error);
+    setRegenBusy(true);
+    const r = await regenerateDeviceKeyAction(Number(keyFor.row.id)).finally(() => setRegenBusy(false));
+    if (!r.ok) return toast.error(humanError(r.error));
     toast.ok(r.message ?? "สร้างใหม่แล้ว");
     setKeyFor({ ...keyFor, key: r.data! });
   }
@@ -102,7 +104,7 @@ export default function DevicesPage() {
         onClose={() => setKeyFor(null)}
         size="lg"
         title={`เชื่อมต่อ ${keyFor?.row.name ?? ""}`}
-        footer={<Button variant="ghost" className="mr-auto" icon={<RefreshCw className="size-4" />} onClick={regen}>สร้าง API key ใหม่</Button>}
+        footer={<Button variant="ghost" className="mr-auto" icon={<RefreshCw className="size-4" />} onClick={regen} loading={regenBusy}>สร้าง API key ใหม่</Button>}
       >
         {keyFor && (
           <div className="flex flex-col gap-4 text-[15px]">
@@ -126,7 +128,7 @@ export default function DevicesPage() {
             ) : (
               <div>
                 <div className="mb-1 text-sm font-medium text-ink-soft">ส่งเวลาจากเครื่อง / โปรแกรมกลาง (middleware)</div>
-                <pre className="thin-scroll overflow-x-auto rounded-md bg-jade-950 p-3 text-xs leading-relaxed text-jade-100">{`POST ${origin}/api/device/push
+                <pre className="thin-scroll overflow-x-auto rounded-lg border border-line bg-paper p-3 text-xs leading-relaxed text-ink">{`POST ${origin}/api/device/push
 x-device-key: ${keyFor.key}
 Content-Type: application/json
 
@@ -157,6 +159,8 @@ function UserMapModal({ device, onClose }: { device: Row; onClose: () => void })
   const [rows, setRows] = useState<MapRow[] | null>(null);
   const [draft, setDraft] = useState<{ user: string; emp: number | null }>({ user: "", emp: null });
   const [q, setQ] = useState("");
+  const [adding, setAdding] = useState(false);
+  const { confirm, dialog } = useConfirm();
   const empById = useMemo(() => new Map(emps.map((e) => [e.id, e])), [emps]);
   const options = useMemo(() => emps.map((e) => ({ value: e.id, label: empName(e), raw: e })), [emps]);
 
@@ -173,16 +177,21 @@ function UserMapModal({ device, onClose }: { device: Row; onClose: () => void })
 
   async function add() {
     if (!draft.user.trim() || !draft.emp) return toast.error("กรุณาระบุรหัสบนเครื่องและเลือกพนักงาน");
+    setAdding(true);
     const { error } = await sb.from("device_user_maps").insert({ device_user_id: draft.user.trim(), employee_id: draft.emp, device_id: Number(device.id) });
+    setAdding(false);
     if (error) return toast.error(humanError(error));
+    toast.ok("เพิ่มการจับคู่แล้ว");
     setDraft({ user: "", emp: null });
     load();
   }
   async function remove(r: MapRow) {
+    if (!(await confirm(`ลบการจับคู่รหัสบนเครื่อง "${r.device_user_id}" ใช่หรือไม่? สแกนจากรหัสนี้จะไม่ถูกนับเป็นของพนักงานคนนี้อีก`, { danger: true, confirmText: "ลบ" }))) return;
     let del = sb.from("device_user_maps").delete().eq("device_user_id", r.device_user_id).eq("employee_id", r.employee_id);
     del = r.device_id == null ? del.is("device_id", null) : del.eq("device_id", r.device_id);
     const { error } = await del;
     if (error) return toast.error(humanError(error));
+    toast.ok("ลบการจับคู่แล้ว");
     load();
   }
 
@@ -199,7 +208,7 @@ function UserMapModal({ device, onClose }: { device: Row; onClose: () => void })
       <div className="mb-3 grid gap-2 sm:grid-cols-[10rem_1fr_auto]">
         <Input value={draft.user} onChange={(e) => setDraft({ ...draft, user: e.target.value })} placeholder="รหัสบนเครื่อง" aria-label="รหัสบนเครื่อง" />
         <EmployeePicker value={draft.emp} onChange={(v) => setDraft({ ...draft, emp: v })} options={options} />
-        <Button icon={<Plus className="size-4" />} onClick={add}>เพิ่ม</Button>
+        <Button icon={<Plus className="size-4" />} onClick={add} loading={adding}>เพิ่ม</Button>
       </div>
       <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="ค้นหา" className="mb-2 h-9 text-sm" />
       {rows === null ? (
@@ -233,6 +242,7 @@ function UserMapModal({ device, onClose }: { device: Row; onClose: () => void })
           </tbody>
         </table>
       )}
+      {dialog}
     </Modal>
   );
 }

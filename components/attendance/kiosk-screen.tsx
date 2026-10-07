@@ -63,37 +63,37 @@ export function KioskScreen({ deviceKey, company, logo, location, deviceName, ha
   const dateText = bkk ? `วัน${TH_DAYS[bkk.getUTCDay()]}ที่ ${bkk.getUTCDate()} ${TH_MONTHS[bkk.getUTCMonth()]} ${bkk.getUTCFullYear() + 543}` : "";
 
   return (
-    <main className="flex min-h-dvh flex-col bg-jade-950 text-white">
+    <main className="flex min-h-dvh flex-col bg-gradient-to-b from-jade-50/70 via-white to-white text-ink">
       <header className="flex items-center gap-3 px-8 py-6">
         {logo ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={logo} alt="" className="size-12 rounded-md bg-white object-contain p-1" />
+          <img src={logo} alt="" className="size-12 rounded-lg border border-line bg-white object-contain p-1" />
         ) : (
-          <div className="grid size-12 place-items-center rounded-md bg-jade-500 text-xl font-bold">HR</div>
+          <div className="grid size-12 place-items-center rounded-lg bg-jade-500 text-xl font-bold text-white">HR</div>
         )}
         <div>
           <h1 className="text-2xl font-semibold">{company}</h1>
-          {location && <div className="text-jade-300">{location}</div>}
+          {location && <div className="text-ink-soft">{location}</div>}
         </div>
       </header>
 
       {!deviceKey ? (
         <section className="m-auto max-w-xl px-8 text-center">
           <p className="text-3xl font-semibold">ยังไม่ได้ตั้งค่าเครื่อง Kiosk</p>
-          <p className="mt-3 text-lg text-jade-200">เปิดหน้านี้ด้วยลิงก์จากเมนู “อุปกรณ์ลงเวลา” (มี API key ของเครื่อง) หรือ API key ไม่ถูกต้อง/ถูกปิดใช้งาน</p>
+          <p className="mt-3 text-lg text-ink-soft">เปิดหน้านี้ด้วยลิงก์จากเมนู “อุปกรณ์ลงเวลา” (มี API key ของเครื่อง) หรือ API key ไม่ถูกต้อง/ถูกปิดใช้งาน</p>
         </section>
       ) : (
         <section className="grid flex-1 items-center gap-10 px-8 pb-10 lg:grid-cols-2">
           <div className="text-center lg:text-left">
-            <div className="num text-[min(22vw,11rem)] font-semibold leading-none tracking-tight" aria-live="off">
+            <div className="num text-[min(22vw,11rem)] font-semibold leading-none tracking-tight text-ink" aria-live="off">
               {hh}:{mm}
-              <span className="text-[0.4em] text-jade-300">:{ss}</span>
+              <span className="text-[0.4em] text-jade-600">:{ss}</span>
             </div>
-            <div className="mt-4 text-2xl text-jade-100 lg:text-3xl">{dateText}</div>
-            <p className="mt-8 text-xl text-jade-200">สแกน QR ด้วยแอป GO HR บนมือถือเพื่อลงเวลาเข้า-ออกงาน</p>
+            <div className="mt-4 text-2xl text-ink-soft lg:text-3xl">{dateText}</div>
+            <p className="mt-8 inline-block rounded-full bg-jade-50 px-5 py-2 text-xl text-jade-800 ring-1 ring-jade-100">สแกน QR ด้วยแอป GO HR บนมือถือเพื่อลงเวลาเข้า-ออกงาน</p>
           </div>
           <div className="mx-auto flex w-full max-w-md flex-col items-center gap-4">
-            <div className="w-full rounded-2xl bg-white p-5 shadow-2xl">
+            <div className="w-full rounded-3xl border border-line bg-white p-6 shadow-[var(--shadow-pop)] ring-4 ring-jade-50">
               {token && !error ? (
                 <QrSvg value={token} className="aspect-square w-full" label="QR Code สำหรับลงเวลา" />
               ) : (
@@ -113,10 +113,10 @@ export function KioskScreen({ deviceKey, company, logo, location, deviceName, ha
             </div>
             {token && !error && (
               <div className="w-full">
-                <div className="h-1.5 overflow-hidden rounded-full bg-white/10">
-                  <div className="h-full bg-jade-400 transition-all duration-1000 ease-linear" style={{ width: `${(left / 30) * 100}%` }} />
+                <div className="h-1.5 overflow-hidden rounded-full bg-gray-200">
+                  <div className="h-full bg-jade-500 transition-all duration-1000 ease-linear" style={{ width: `${(left / 30) * 100}%` }} />
                 </div>
-                <p className="mt-2 text-center text-sm text-jade-300">QR เปลี่ยนทุก 30 วินาที · {deviceName}</p>
+                <p className="mt-2 text-center text-sm text-ink-mute">QR เปลี่ยนทุก 30 วินาที · {deviceName}</p>
               </div>
             )}
           </div>

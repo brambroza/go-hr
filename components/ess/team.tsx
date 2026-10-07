@@ -205,8 +205,12 @@ function TeamCheckinModal({ member, onClose, onDone, supervisorName }: { member:
         <input ref={file} type="file" accept="image/*" capture="environment" className="sr-only" tabIndex={-1} aria-hidden onChange={async (e) => {
           const f = e.target.files?.[0];
           if (!f) return;
-          const blob = await resizeImage(f, 960, 0.8);
-          setPhoto({ blob, preview: URL.createObjectURL(blob) });
+          try {
+            const blob = await resizeImage(f, 960, 0.8);
+            setPhoto({ blob, preview: URL.createObjectURL(blob) });
+          } catch {
+            toast.error("อ่านรูปไม่ได้ ลองถ่ายใหม่อีกครั้ง");
+          }
         }} />
         <div className="flex items-center gap-3">
           {photo && (

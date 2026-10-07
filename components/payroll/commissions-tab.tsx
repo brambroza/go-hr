@@ -24,6 +24,7 @@ export function CommissionsTab({ periodId, editable, onChanged }: { periodId: nu
   const [rows, setRows] = useState<Row[] | null>(null);
   const [form, setForm] = useState<Partial<Row> | null>(null);
   const [saving, setSaving] = useState(false);
+  const [recomputing, setRecomputing] = useState(false);
   const canEdit = editable && can("payroll", "edit");
 
   const load = useCallback(async () => {
@@ -57,7 +58,8 @@ export function CommissionsTab({ periodId, editable, onChanged }: { periodId: nu
   }
 
   async function recompute() {
-    const r = await recomputeCommissionsAction(periodId);
+    setRecomputing(true);
+    const r = await recomputeCommissionsAction(periodId).finally(() => setRecomputing(false));
     if (!r.ok) return toast.error(r.error);
     toast.ok(r.message ?? "คำนวณแล้ว");
     load();
@@ -71,7 +73,7 @@ export function CommissionsTab({ periodId, editable, onChanged }: { periodId: nu
         </p>
         {canEdit && (
           <div className="flex gap-2">
-            <Button variant="secondary" size="sm" icon={<Calculator className="size-4" />} onClick={recompute} disabled={!rows?.length}>
+            <Button variant="secondary" size="sm" icon={<Calculator className="size-4" />} onClick={recompute} loading={recomputing} disabled={!rows?.length}>
               คำนวณตามแผนอีกครั้ง
             </Button>
             <Button size="sm" icon={<Plus className="size-4" />} onClick={() => setForm({ plan_id: plans.find((p) => p.is_active)?.id })} disabled={!plans.length}>
@@ -120,6 +122,7 @@ export function CommissionsTab({ periodId, editable, onChanged }: { periodId: nu
                           if (!(await confirm("ลบรายการนี้ใช่หรือไม่?", { danger: true, confirmText: "ลบ" }))) return;
                           const { error } = await sb.from("commission_entries").delete().eq("id", r.id);
                           if (error) return toast.error(humanError(error));
+                          toast.ok("ลบรายการแล้ว");
                           load();
                           onChanged();
                         }}

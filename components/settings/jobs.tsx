@@ -34,6 +34,7 @@ export function JobsSettings() {
     setRows((l) => l?.map((x) => (x.code === j.code ? { ...x, is_enabled: on } : x)) ?? null);
     const { error } = await sb.from("scheduled_jobs").update({ is_enabled: on }).eq("code", j.code);
     if (error) (toast.error(error.message), load());
+    else toast.ok(on ? `เปิดงาน “${j.name}” แล้ว` : `ปิดงาน “${j.name}” แล้ว`);
   };
   const run = async (j: Job) => {
     setRunning(j.code);

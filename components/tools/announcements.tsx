@@ -102,6 +102,7 @@ export function AnnouncementsAdmin() {
   const togglePin = async (a: Ann) => {
     const { error } = await sb.from("announcements").update({ is_pinned: !a.is_pinned }).eq("id", a.id);
     if (error) return toast.error(error.message);
+    toast.ok(a.is_pinned ? "เลิกปักหมุดแล้ว" : "ปักหมุดประกาศแล้ว");
     load();
   };
 

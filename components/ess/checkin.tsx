@@ -18,7 +18,7 @@ import { toPgArray } from "./face-api-loader";
 // face-api + TensorFlow.js are loaded only when the "สแกนใบหน้า" tab is opened
 const FaceCamera = dynamic(() => import("./face-scan").then((m) => m.FaceCamera), {
   ssr: false,
-  loading: () => <div className="grid aspect-square w-full place-items-center rounded-[var(--radius-panel)] bg-jade-950 text-sm text-jade-100">กำลังโหลดระบบสแกนใบหน้า…</div>,
+  loading: () => <div className="grid aspect-square w-full place-items-center rounded-[var(--radius-panel)] border border-line bg-paper text-sm text-ink-soft">กำลังโหลดระบบสแกนใบหน้า…</div>,
 });
 
 type Method = "gps" | "qr" | "face" | "wifi";
@@ -87,6 +87,7 @@ export function CheckinScreen() {
   const [allowedIds, setAllowedIds] = useState<number[] | null>(null);
   const [photo, setPhoto] = useState<{ blob: Blob; preview: string } | null>(null);
   const [busy, setBusy] = useState(false);
+  const [syncing, setSyncing] = useState(false);
   const [result, setResult] = useState<Result | null>(null);
   const [queue, setQueue] = useState<QueuedCheckin[]>([]);
   const [online, setOnline] = useState(true);
@@ -96,6 +97,13 @@ export function CheckinScreen() {
   useEffect(() => {
     if (result && method !== "gps") resultRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
   }, [result, method]);
+  // every check-in attempt also gets a toast, so the outcome is visible even when the result card is off-screen
+  useEffect(() => {
+    if (!result) return;
+    if (!result.ok) toast.error(`ลงเวลาไม่สำเร็จ: ${result.message}`);
+    else if (result.offline) toast.info(`บันทึกเวลา ${thTime(result.time)} น. ไว้ในเครื่องแล้ว — รอซิงก์`);
+    else toast.ok(`ลงเวลาสำเร็จ ${thTime(result.time)} น.${result.location ? ` · ${result.location}` : ""}`);
+  }, [result]);
   const geo = useGeo(true);
 
   useEffect(() => {
@@ -326,26 +334,26 @@ export function CheckinScreen() {
   return (
     <main className="mx-auto w-full max-w-md">
       {/* Clock hero */}
-      <section className="bg-jade-950 px-5 pb-6 pt-5 text-white">
-        <div className="flex items-center justify-between text-sm text-jade-300">
+      <section className="mx-4 mt-4 rounded-[1.25rem] border border-jade-100 bg-gradient-to-b from-jade-50 to-white px-5 pb-9 pt-5 text-ink ring-4 ring-jade-50/60">
+        <div className="flex items-center justify-between text-sm text-ink-soft">
           <span>{now ? thDate(isoDate(now), "long") : " "}</span>
-          <span className={clsx("inline-flex items-center gap-1.5", online ? "text-jade-300" : "text-amber-200")}>
-            <span className={clsx("size-2 rounded-full", online ? "bg-jade-400" : "bg-amber-300")} />
+          <span className={clsx("inline-flex items-center gap-1.5", online ? "text-jade-700" : "text-amber-ink")}>
+            <span className={clsx("size-2 rounded-full", online ? "bg-jade-500" : "bg-amber-500")} />
             {online ? "ออนไลน์" : "ออฟไลน์"}
           </span>
         </div>
         <h1 className="sr-only">ลงเวลา</h1>
         <div className="num mt-3 flex items-baseline justify-center font-semibold leading-none tracking-tight" aria-label={t ? `เวลา ${t.hh}:${t.mm} น.` : undefined} role="timer">
-          <span className="text-[88px]">{t ? `${t.hh}:${t.mm}` : "--:--"}</span>
-          <span className="ml-1.5 w-[2.2ch] text-[32px] text-jade-400">{t?.ss ?? "--"}</span>
+          <span className="text-[88px] text-ink">{t ? `${t.hh}:${t.mm}` : "--:--"}</span>
+          <span className="ml-1.5 w-[2.2ch] text-[32px] text-jade-600">{t?.ss ?? "--"}</span>
         </div>
-        <div className="mt-3 text-center text-[15px] text-jade-200">
+        <div className="mt-3 text-center text-[15px] text-ink-soft">
           {!today ? (
             " "
           ) : isWorkDay && today.shift ? (
             <>
-              กะวันนี้ <span className="num font-semibold text-white">{today.shift.start_time} – {today.shift.end_time}</span>
-              <span className="text-jade-400"> · {today.shift.name}</span>
+              กะวันนี้ <span className="num font-semibold text-ink">{today.shift.start_time} – {today.shift.end_time}</span>
+              <span className="text-ink-mute"> · {today.shift.name}</span>
             </>
           ) : (
             <>{today.holiday ?? DAY_TYPE_LABEL[today.day_type]} — ลงเวลาได้ถ้ามาทำงาน</>
@@ -355,7 +363,7 @@ export function CheckinScreen() {
 
       <div className="px-4">
         {/* Method switch */}
-        <div role="tablist" aria-label="วิธีลงเวลา" className="-mt-5 grid grid-cols-4 gap-1 rounded-[var(--radius-panel)] border border-line bg-white p-1 shadow-sm">
+        <div role="tablist" aria-label="วิธีลงเวลา" className="relative -mt-6 grid grid-cols-4 gap-1 rounded-[var(--radius-panel)] border border-line bg-white p-1 shadow-[var(--shadow-pop)]">
           {(
             [
               { v: "gps", label: "GPS", icon: LocateFixed },
@@ -375,7 +383,7 @@ export function CheckinScreen() {
               }}
               className={clsx(
                 "flex min-h-14 flex-col items-center justify-center gap-0.5 rounded-[calc(var(--radius-panel)-4px)] px-1 py-1.5 text-[13px] font-medium leading-tight",
-                method === m.v ? "bg-jade-600 text-white" : "text-ink-soft active:bg-jade-50",
+                method === m.v ? "bg-jade-50 text-jade-700 ring-1 ring-jade-200" : "text-ink-soft active:bg-paper",
               )}
             >
               <m.icon className="size-5" /> {m.label}
@@ -514,7 +522,7 @@ export function CheckinScreen() {
             <div className="relative">
               { }
               <img src={photo.preview} alt="รูปยืนยันการลงเวลา" className="size-14 rounded-[var(--radius-ctl)] object-cover" />
-              <button className="absolute -right-2 -top-2 grid size-6 place-items-center rounded-full bg-ink text-white" aria-label="ลบรูป" onClick={() => setPhoto(null)}>
+              <button className="absolute -right-2 -top-2 grid size-6 place-items-center rounded-full border border-line bg-white text-ink-soft shadow-[var(--shadow-soft)]" aria-label="ลบรูป" onClick={() => setPhoto(null)}>
                 <X className="size-3.5" />
               </button>
             </div>
@@ -538,10 +546,10 @@ export function CheckinScreen() {
             disabled={busy || !net || net.loading || !net.locations.length || !online}
             className={clsx(
               "mt-4 flex h-[68px] w-full items-center justify-center gap-2.5 rounded-[var(--radius-panel)] text-[19px] font-semibold text-white shadow-sm transition-colors",
-              busy || !net?.locations.length || !online ? "bg-jade-300" : "bg-jade-600 active:bg-jade-800",
+              busy || !net?.locations.length || !online ? "bg-jade-100 !text-jade-800 shadow-none" : "bg-jade-600 active:bg-jade-800",
             )}
           >
-            {busy ? <Spinner className="size-6 text-white" /> : <Wifi className="size-6" />}
+            {busy ? <Spinner className="size-6 !text-current" /> : <Wifi className="size-6" />}
             {busy ? "กำลังบันทึก…" : online ? actionLabel : "ออฟไลน์อยู่ — ลงเวลาด้วย Wi-Fi ไม่ได้"}
           </button>
         )}
@@ -553,10 +561,10 @@ export function CheckinScreen() {
             disabled={busy || (!geo.fix && !geo.error)}
             className={clsx(
               "mt-4 flex h-[68px] w-full items-center justify-center gap-2.5 rounded-[var(--radius-panel)] text-[19px] font-semibold text-white shadow-sm transition-colors",
-              busy || (!geo.fix && !geo.error) ? "bg-jade-300" : "bg-jade-600 active:bg-jade-800",
+              busy || (!geo.fix && !geo.error) ? "bg-jade-100 !text-jade-800 shadow-none" : "bg-jade-600 active:bg-jade-800",
             )}
           >
-            {busy ? <Spinner className="size-6 text-white" /> : online ? <Fingerprint /> : <CloudOff className="size-6" />}
+            {busy ? <Spinner className="size-6 !text-current" /> : online ? <Fingerprint /> : <CloudOff className="size-6" />}
             {busy ? "กำลังบันทึก…" : online ? actionLabel : `${actionLabel} (ออฟไลน์)`}
           </button>
         )}
@@ -606,10 +614,13 @@ export function CheckinScreen() {
                 size="sm"
                 variant="secondary"
                 disabled={!online}
+                loading={syncing}
                 onClick={async () => {
-                  const r = await syncQueue();
+                  setSyncing(true);
+                  const r = await syncQueue().finally(() => setSyncing(false));
                   if (r.synced) toast.ok(`ซิงก์แล้ว ${r.synced} รายการ`);
                   else if (r.failed) toast.error("ยังซิงก์ไม่ได้ ดูเหตุผลในรายการ");
+                  else toast.info("ไม่มีรายการที่ต้องซิงก์");
                 }}
               >
                 ซิงก์ตอนนี้

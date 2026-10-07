@@ -35,14 +35,19 @@ export function LicenseSettings({ version }: { version: string }) {
     setErr(null);
     const r = await saveLicenseAction(text);
     setBusy(false);
-    if (!r.ok) return setErr(r.error);
+    if (!r.ok) {
+      setErr(r.error);
+      return toast.error(`ติดตั้ง License ไม่สำเร็จ: ${r.error}`);
+    }
     toast.ok(`ติดตั้ง License ของ ${r.data?.licensee} แล้ว (สูงสุด ${r.data?.max_employees} คน)`);
     setText("");
     load();
   };
   const remove = async () => {
     if (!(await confirm("ถอน License? ระบบจะกลับเป็นรุ่นทดลอง และเพิ่มพนักงานใหม่ไม่ได้จนกว่าจะติดตั้ง License ใหม่", { danger: true, confirmText: "ถอน License" }))) return;
+    setBusy(true);
     const r = await removeLicenseAction();
+    setBusy(false);
     if (!r.ok) return toast.error(r.error);
     toast.ok(r.message!);
     load();

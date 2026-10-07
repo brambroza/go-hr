@@ -24,7 +24,7 @@ export function Drawer({ open, onClose, title, children, footer, wide }: { open:
         onClose();
       }}
       onClick={(e) => e.target === ref.current && onClose()}
-      className={clsx("no-print fixed inset-y-0 right-0 left-auto m-0 h-dvh max-h-dvh w-full border-l border-line bg-white p-0 text-ink shadow-2xl backdrop:bg-jade-950/40", wide ? "max-w-3xl" : "max-w-xl")}
+      className={clsx("no-print fixed inset-y-0 right-0 left-auto m-0 h-dvh max-h-dvh w-full border-l border-line bg-white p-0 text-ink shadow-[var(--shadow-pop)]", wide ? "max-w-3xl" : "max-w-xl")}
     >
       {open && (
         <div className="flex h-full flex-col">

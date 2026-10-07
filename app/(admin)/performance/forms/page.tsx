@@ -58,6 +58,7 @@ export default function FormsPage() {
     if (!(await confirm(`ลบแบบประเมิน “${f.name}” ใช่หรือไม่? (ถ้าถูกใช้ในรอบการประเมินแล้วจะลบไม่ได้ ให้ปิดการใช้งานแทน)`, { danger: true, confirmText: "ลบ" }))) return;
     const { error } = await sb.from("eval_forms").delete().eq("id", f.id);
     if (error) return toast.error(humanError(error));
+    toast.ok("ลบแบบประเมินแล้ว");
     load();
   }
 

@@ -171,11 +171,13 @@ function Rules() {
     setRows((l) => l?.map((x) => (x.id === r.id ? { ...x, is_enabled: on } : x)) ?? null);
     const { error } = await sb.from("automation_rules").update({ is_enabled: on }).eq("id", r.id);
     if (error) (toast.error(error.message), load());
+    else toast.ok(on ? `เปิดใช้กฎ “${r.name}” แล้ว` : `ปิดกฎ “${r.name}” แล้ว`);
   };
   const remove = async (r: Rule) => {
     if (!(await confirm(`ลบกฎ "${r.name}"?`, { danger: true, confirmText: "ลบกฎ" }))) return;
     const { error } = await sb.from("automation_rules").delete().eq("id", r.id);
     if (error) return toast.error(error.message);
+    toast.ok("ลบกฎแล้ว");
     load();
   };
 

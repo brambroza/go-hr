@@ -41,6 +41,7 @@ export function AttachmentsField({ value, onChange, bucket = "documents", folder
         added.push({ name: r.name, url: r.url, type: r.type });
       }
       onChange([...list, ...added]);
+      if (added.length) toast.ok(`แนบไฟล์แล้ว ${added.length} ไฟล์ กด “บันทึก” เพื่อยืนยัน`);
     } catch (e) {
       toast.error(`อัปโหลดไม่สำเร็จ: ${e instanceof Error ? e.message : String(e)}`);
     } finally {

@@ -74,6 +74,7 @@ export function InterviewsPanel({ applicantId, interviews, onChange, canEdit }: 
     const { error } = await sb.from("interviews").update({ result }).eq("id", iv.id);
     if (error) return toast.error(humanError(error));
     await sb.from("applicant_activities").insert({ applicant_id: applicantId, activity_type: "interview", note: `ผลสัมภาษณ์รอบที่ ${iv.round}: ${INTERVIEW_RESULT[result]}` });
+    toast.ok(`บันทึกผลสัมภาษณ์ “${INTERVIEW_RESULT[result]}” แล้ว`);
     onChange();
   }
 
@@ -81,6 +82,7 @@ export function InterviewsPanel({ applicantId, interviews, onChange, canEdit }: 
     if (!(await confirm("ลบนัดสัมภาษณ์นี้ใช่หรือไม่?", { danger: true, confirmText: "ลบ" }))) return;
     const { error } = await sb.from("interviews").delete().eq("id", iv.id);
     if (error) return toast.error(humanError(error));
+    toast.ok("ลบนัดสัมภาษณ์แล้ว");
     onChange();
   }
 

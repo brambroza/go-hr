@@ -6,7 +6,7 @@ import { Award, Cake, EyeOff, Eye, ImagePlus, Megaphone, MessageCircle, Papercli
 import { supabaseBrowser } from "@/lib/supabase/client";
 import { useCan, useMe } from "@/components/app/me-context";
 import { Avatar } from "@/components/employees/avatar";
-import { Badge, Button, Modal, Spinner, Textarea, clsx, toast, useConfirm } from "@/components/ui";
+import { Badge, Button, Modal, Spinner, Textarea, clsx, errorText, toast, useConfirm } from "@/components/ui";
 import { resizeImage, uploadFile } from "@/lib/storage";
 import { thDateTime } from "@/lib/format";
 import { RichText } from "./rich-text";
@@ -143,13 +143,16 @@ export function Feed({ variant = "desktop" }: { variant?: "desktop" | "mobile" }
     if (error) return toast.error(error.message), false;
     await people.load([me.userId]);
     setComments((m) => new Map(m).set(post.id, [...(m.get(post.id) ?? []), data as Comment]));
+    toast.ok("แสดงความคิดเห็นแล้ว");
     return true;
   };
 
   const deleteComment = async (c: Comment) => {
+    if (!(await confirm("ลบความคิดเห็นนี้?", { danger: true, confirmText: "ลบ" }))) return;
     const { error } = await sb.from("feed_comments").delete().eq("id", c.id);
     if (error) return toast.error(error.message);
     setComments((m) => new Map(m).set(c.post_id, (m.get(c.post_id) ?? []).filter((x) => x.id !== c.id)));
+    toast.ok("ลบความคิดเห็นแล้ว");
   };
 
   const setHidden = async (post: Post, hidden: boolean) => {
@@ -164,6 +167,7 @@ export function Feed({ variant = "desktop" }: { variant?: "desktop" | "mobile" }
     const { error } = await sb.from("feed_posts").delete().eq("id", post.id);
     if (error) return toast.error(error.message);
     setPosts((l) => l.filter((p) => p.id !== post.id));
+    toast.ok("ลบโพสต์แล้ว");
   };
 
   const unread = (anns ?? []).filter((a) => !a.read_at).length;
@@ -295,7 +299,7 @@ function Composer({ variant, onPosted, dir }: { variant: string; onPosted: (p: P
       setMode("post");
       toast.ok(mode === "kudos" ? "ส่งคำชื่นชมแล้ว" : "โพสต์แล้ว");
     } catch (e) {
-      toast.error(`โพสต์ไม่สำเร็จ: ${(e as Error).message}`);
+      toast.error(`โพสต์ไม่สำเร็จ: ${errorText(e)}`);
     } finally {
       setBusy(false);
     }

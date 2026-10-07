@@ -5,7 +5,7 @@ import { Download, Pencil, Plus, Search, Trash2, ChevronLeft, ChevronRight, Arro
 import { supabaseBrowser } from "@/lib/supabase/client";
 import { useCan } from "@/components/app/me-context";
 import type { MenuKey } from "@/lib/permissions";
-import { Badge, Button, Empty, Input, PageHeader, Panel, Select, Spinner, clsx, toast, useConfirm } from "@/components/ui";
+import { Badge, Button, Empty, Input, PageHeader, Panel, Select, Spinner, clsx, errorText, toast, useConfirm } from "@/components/ui";
 import { FormFields, type FieldDef, cleanValues, initialValues, useRefOptions } from "./form-fields";
 import { Modal } from "@/components/ui";
 import { downloadCsv } from "@/lib/csv";
@@ -433,12 +433,7 @@ function DateCell({ v }: { v: string }) {
   return <span className="num whitespace-nowrap">{`${d[2]} ${m} ${d[0] + 543}`}</span>;
 }
 
+/** Postgres / RLS / network errors → short Thai message (shared with runAction via errorText). */
 export function humanError(e: unknown): string {
-  const msg = typeof e === "object" && e && "message" in e ? String((e as { message: unknown }).message) : String(e);
-  if (msg.includes("duplicate key")) return "ข้อมูลซ้ำกับรายการที่มีอยู่แล้ว (เช่น รหัสซ้ำ)";
-  if (msg.includes("violates foreign key") && msg.includes("delete")) return "ลบไม่ได้ เพราะมีข้อมูลอื่นอ้างอิงรายการนี้อยู่";
-  if (msg.includes("violates foreign key")) return "ข้อมูลอ้างอิงไม่ถูกต้อง หรือมีข้อมูลอื่นใช้รายการนี้อยู่";
-  if (msg.includes("row-level security")) return "คุณไม่มีสิทธิ์ทำรายการนี้";
-  if (msg.includes("violates check constraint")) return "ค่าที่กรอกไม่อยู่ในรูปแบบที่กำหนด";
-  return msg;
+  return errorText(e);
 }

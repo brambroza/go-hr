@@ -5,6 +5,9 @@ import { Plus, Trash2 } from "lucide-react";
 import { useCan } from "@/components/app/me-context";
 import { Button, Checkbox, Field, Input, PageHeader, Panel, Select, Spinner, Tabs, Textarea, Toggle, clsx } from "@/components/ui";
 import { useSetting } from "./use-setting";
+import Link from "next/link";
+import { LEGACY_BANK_KEYS } from "@/lib/payroll/files";
+import { useFileLayouts } from "@/components/payroll/file-export";
 
 // ---------------------------------------------------------------- types & defaults (mirror supabase/seed.sql)
 type Att = {
@@ -22,11 +25,11 @@ const ATT: Att = {
 type Pay = {
   daily_divisor: number; hours_per_day: number; round_mode: string; advance_limit_percent: number; prorate_new_joiner: boolean;
   deduct_absent: boolean; deduct_late: boolean; deduct_early: boolean; payslip_password: string; payslip_show_ytd?: boolean; payslip_note?: string;
-  bank_file_format: string; company_bank: { bank_code: string; account: string; branch: string; company_id?: string };
+  bank_file_format: string; company_bank: { bank_code: string; account: string; branch: string; company_id?: string; sender_name?: string };
 };
 const PAY: Pay = {
   daily_divisor: 30, hours_per_day: 8, round_mode: "satang", advance_limit_percent: 50, prorate_new_joiner: true, deduct_absent: true, deduct_late: true, deduct_early: true,
-  payslip_password: "birthdate", payslip_show_ytd: true, payslip_note: "", bank_file_format: "generic", company_bank: { bank_code: "004", account: "", branch: "", company_id: "" },
+  payslip_password: "birthdate", payslip_show_ytd: true, payslip_note: "", bank_file_format: "bank_generic_csv", company_bank: { bank_code: "004", account: "", branch: "", company_id: "" },
 };
 type Bracket = { upto: number | null; rate: number };
 type Deduction = { code: string; name: string; max?: number; per_unit?: number; group?: string; retirement?: boolean; donation?: boolean; multiplier?: number };
@@ -220,6 +223,7 @@ function PayrollTab() {
   const ro = !useCan()("settings", "edit");
   const { value: v, setValue, save, saving } = useSetting<Pay>("payroll", PAY);
   const [err, setErr] = useState<string | null>(null);
+  const { layouts: bankLayouts } = useFileLayouts("bank");
   if (!v) return <Loading />;
   const set = (p: Partial<Pay>) => setValue({ ...v, ...p });
   const bank = { ...PAY.company_bank, ...v.company_bank };
@@ -258,18 +262,15 @@ function PayrollTab() {
                 {BANKS.map(([c, nme]) => <option key={c} value={c}>{c} · {nme}</option>)}
               </Select>
             </Field>
-            <Field label="รูปแบบไฟล์โอนเงินเดือน">
-              <Select value={v.bank_file_format} onChange={(e) => set({ bank_file_format: e.target.value })}>
-                <option value="generic">ทั่วไป (CSV)</option>
-                <option value="kbank">กสิกรไทย (K-Cash Connect)</option>
-                <option value="scb">ไทยพาณิชย์ (SCB Business Net)</option>
-                <option value="bbl">กรุงเทพ (iCash)</option>
-                <option value="ktb">กรุงไทย (KTB Corporate)</option>
+            <Field label="รูปแบบไฟล์โอนเงินเดือน" hint={<Link href="/settings/file-formats" className="text-jade-700 underline">ดู / ปรับรูปแบบไฟล์</Link>}>
+              <Select value={LEGACY_BANK_KEYS[v.bank_file_format] ?? v.bank_file_format} onChange={(e) => set({ bank_file_format: e.target.value })}>
+                {bankLayouts.map((l) => <option key={l.key} value={l.key}>{l.key.startsWith("custom_") ? "★ " : ""}{l.label}</option>)}
               </Select>
             </Field>
             <Field label="เลขที่บัญชีบริษัท"><Input inputMode="numeric" value={bank.account} onChange={(e) => setBank({ account: e.target.value })} placeholder="xxx-x-xxxxx-x" /></Field>
             <Field label="สาขา"><Input value={bank.branch} onChange={(e) => setBank({ branch: e.target.value })} /></Field>
             <Field label="Company ID (รหัสบริษัทในระบบธนาคาร)" hint="ใช้ในหัวไฟล์ของบางธนาคาร"><Input value={bank.company_id ?? ""} onChange={(e) => setBank({ company_id: e.target.value })} /></Field>
+            <Field label="ชื่อผู้โอน (ชื่อบัญชีบริษัท)" hint="ใช้ในไฟล์ KTB (Sender Name) — ว่าง = ชื่อบริษัท"><Input value={bank.sender_name ?? ""} onChange={(e) => setBank({ sender_name: e.target.value })} /></Field>
           </div>
         </Panel>
         <Panel title="สลิปเงินเดือน">

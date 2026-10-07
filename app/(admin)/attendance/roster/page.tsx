@@ -112,6 +112,7 @@ export default function RosterPage() {
       } else {
         await upsert([{ employee_id: cell.emp.id, work_date: cell.date, shift_id: kind === "shift" ? shiftId! : null, is_day_off: kind === "off" }]);
       }
+      toast.ok(kind === "clear" ? "กลับไปใช้กะประจำแล้ว" : kind === "off" ? "ตั้งเป็นวันหยุดแล้ว" : "เปลี่ยนกะแล้ว");
       setCell(null);
       await reload();
     } catch (e) {

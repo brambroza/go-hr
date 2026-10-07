@@ -73,6 +73,7 @@ export function HireWizard({ open, onClose, applicant, posting, onHired }: { ope
     setBusy(false);
     if (error) return toast.error(humanError(error));
     invalidateDirectory();
+    toast.ok(`บรรจุเป็นพนักงานแล้ว รหัส ${v.code.trim()}`);
     setDone({ id: data as number, code: v.code.trim() });
     onHired(data as number);
   }

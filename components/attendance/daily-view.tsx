@@ -240,7 +240,7 @@ export function DailyView({ from, to, today }: { from: string; to: string; today
                         <div className="font-medium">{empName(e)}</div>
                         <div className="text-xs text-ink-mute">{e?.code} · {e?.org_unit_name ?? "-"}</div>
                       </td>
-                      <td className="px-3 py-2">{s ? <ShiftChip code={s.code} color={nonWork ? "#dbe3df" : s.color} title={s.name} /> : <span className="text-ink-mute">-</span>}</td>
+                      <td className="px-3 py-2">{s ? <ShiftChip code={s.code} color={nonWork ? "#e5e7eb" : s.color} title={s.name} /> : <span className="text-ink-mute">-</span>}</td>
                       <td className={clsx("num whitespace-nowrap px-3 py-2", nonWork ? "text-ink-mute" : "text-ink-soft")}>{d.sched_in ? `${thTime(d.sched_in)}–${thTime(d.sched_out)}` : "-"}</td>
                       <td className={clsx("num px-3 py-2", d.late_minutes > 0 && "font-medium text-amber-ink")}>{thTime(d.actual_in)}</td>
                       <td className={clsx("num px-3 py-2", d.early_minutes > 0 && "font-medium text-amber-ink")}>{thTime(d.actual_out)}</td>

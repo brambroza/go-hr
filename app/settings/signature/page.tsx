@@ -4,7 +4,6 @@ import { ArrowLeft } from "lucide-react";
 import { getMe } from "@/lib/auth";
 import { isBackOffice } from "@/lib/permissions";
 import { supabaseServer } from "@/lib/supabase/server";
-import { Toaster } from "@/components/ui";
 import { SignatureSettings } from "@/components/requests/signature-settings";
 
 export const metadata = { title: "ตั้งค่าลายเซ็น" };
@@ -29,7 +28,6 @@ export default async function SignaturePage({ searchParams }: PageProps<"/settin
         </p>
         <SignatureSettings current={data?.signature_url ?? null} userId={me.userId} />
       </div>
-      <Toaster />
     </main>
   );
 }

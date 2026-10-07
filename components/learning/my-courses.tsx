@@ -70,7 +70,7 @@ export function MyCourses() {
             return (
               <li key={c.id}>
                 <Link href={`/m/learning/${c.id}`} className="flex gap-3 overflow-hidden rounded-[var(--radius-panel)] border border-line bg-white p-3 active:bg-jade-50">
-                  <div className="grid size-20 shrink-0 place-items-center overflow-hidden rounded-[var(--radius-ctl)] bg-jade-800 text-jade-300">
+                  <div className="grid size-20 shrink-0 place-items-center overflow-hidden rounded-[var(--radius-ctl)] bg-jade-50 text-jade-600">
                     {c.cover_url ? (
                        
                       <img src={c.cover_url} alt="" className="h-full w-full object-cover" />

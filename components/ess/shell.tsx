@@ -63,14 +63,14 @@ export function EssShell({ company, backOffice, children }: { company: { name: s
 
   return (
     <div className="min-h-dvh bg-paper">
-      <header className="no-print sticky top-0 z-30 border-b border-line bg-white/95 pt-[env(safe-area-inset-top)] backdrop-blur">
+      <header className="no-print sticky top-0 z-30 border-b border-line bg-white/85 pt-[env(safe-area-inset-top)] backdrop-blur-md">
         <div className="mx-auto flex h-14 max-w-md items-center gap-2.5 px-4">
           <Link href="/m" className="flex min-w-0 flex-1 items-center gap-2.5">
             {company.logo_url ? (
                
               <img src={company.logo_url} alt="" className="size-8 rounded-md bg-white object-contain" />
             ) : (
-              <span className="grid size-8 shrink-0 place-items-center rounded-md bg-jade-600 text-sm font-bold text-white">HR</span>
+              <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-jade-500 text-sm font-bold text-white">HR</span>
             )}
             <span className="truncate text-[15px] font-semibold text-ink">{company.name}</span>
           </Link>
@@ -82,7 +82,7 @@ export function EssShell({ company, backOffice, children }: { company: { name: s
           <Notifications />
         </div>
         {(!online || queued > 0) && (
-          <Link href="/m/checkin" className={clsx("flex items-center justify-center gap-2 px-4 py-1.5 text-sm", online ? "bg-amber-50 text-amber-ink" : "bg-ink text-white")}>
+          <Link href="/m/checkin" className={clsx("flex items-center justify-center gap-2 px-4 py-1.5 text-sm", online ? "bg-amber-50 text-amber-ink" : "bg-gray-100 text-ink")}>
             <WifiOff className="size-4" />
             {!online ? "ออฟไลน์อยู่ — ลงเวลาได้ ระบบจะส่งให้เมื่อกลับมาออนไลน์" : `มีการลงเวลารอซิงก์ ${queued} รายการ`}
           </Link>
@@ -91,7 +91,7 @@ export function EssShell({ company, backOffice, children }: { company: { name: s
 
       <div className="pb-[calc(5.5rem+env(safe-area-inset-bottom))]">{children}</div>
 
-      <nav aria-label="เมนูหลัก" className="no-print fixed inset-x-0 bottom-0 z-30 border-t border-line bg-white pb-[env(safe-area-inset-bottom)]">
+      <nav aria-label="เมนูหลัก" className="no-print fixed inset-x-0 bottom-0 z-30 border-t border-line bg-white/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-md">
         <ul className="mx-auto grid h-16 max-w-md grid-cols-5">
           {TABS.map((t) => {
             const active = isActive(t);
@@ -104,7 +104,7 @@ export function EssShell({ company, backOffice, children }: { company: { name: s
                   aria-current={active ? "page" : undefined}
                   className={clsx("flex h-full flex-col items-center justify-center gap-0.5 text-[12px] transition-colors", active ? "font-semibold text-jade-700" : "text-ink-mute active:text-jade-700")}
                 >
-                  <span className={clsx("grid place-items-center rounded-full", center ? clsx("size-9", active ? "bg-jade-600 text-white" : "bg-jade-50 text-jade-700") : "size-7")}>
+                  <span className={clsx("grid place-items-center rounded-full", center ? clsx("size-9", active ? "bg-jade-500 text-white" : "bg-jade-50 text-jade-700") : "size-7")}>
                     <Icon className={center ? "size-5" : "size-[22px]"} strokeWidth={active ? 2.3 : 1.9} />
                   </span>
                   {t.label}
@@ -114,8 +114,6 @@ export function EssShell({ company, backOffice, children }: { company: { name: s
           })}
         </ul>
       </nav>
-      {/* keep toasts above the bottom nav */}
-      <style>{`[aria-live="polite"].fixed{bottom:calc(5.25rem + env(safe-area-inset-bottom))!important}`}</style>
     </div>
   );
 }
@@ -148,7 +146,7 @@ export function MPage({ title, description, back, actions, children, className }
 
 export function Card({ children, className, title, action }: { children: ReactNode; className?: string; title?: ReactNode; action?: ReactNode }) {
   return (
-    <section className={clsx("rounded-[var(--radius-panel)] border border-line bg-white", className)}>
+    <section className={clsx("rounded-[var(--radius-panel)] border border-line/80 bg-white shadow-[var(--shadow-soft)]", className)}>
       {(title || action) && (
         <header className="flex items-center justify-between gap-2 px-4 pb-1 pt-3.5">
           {title && <h2 className="text-[15px] font-semibold text-ink">{title}</h2>}

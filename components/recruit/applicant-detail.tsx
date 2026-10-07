@@ -43,6 +43,8 @@ export function ApplicantDetail({ id }: { id: number }) {
   const [a, setA] = useState<Ap | null | undefined>(undefined);
   const [posting, setPosting] = useState<Posting | null>(null);
   const [acts, setActs] = useState<Act[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [noting, setNoting] = useState(false);
   const [ivs, setIvs] = useState<Interview[]>([]);
   const [resume, setResume] = useState<string | null>(null);
   const [photo, setPhoto] = useState<string | null>(null);
@@ -82,15 +84,20 @@ export function ApplicantDetail({ id }: { id: number }) {
   }, [sp, a, canEdit]);
 
   async function patch(p: Partial<Ap>, msg = "บันทึกแล้ว") {
+    setSaving(true);
     const { error } = await sb.from("applicants").update(p).eq("id", id);
+    setSaving(false);
     if (error) return toast.error(humanError(error));
     toast.ok(msg);
     load();
   }
   async function addNote() {
-    if (!note.trim()) return;
+    if (!note.trim() || noting) return;
+    setNoting(true);
     const { error } = await sb.from("applicant_activities").insert({ applicant_id: id, activity_type: "note", note: note.trim() });
+    setNoting(false);
     if (error) return toast.error(humanError(error));
+    toast.ok("เพิ่มบันทึกแล้ว");
     setNote("");
     load();
   }
@@ -224,7 +231,7 @@ export function ApplicantDetail({ id }: { id: number }) {
               </Field>
               {canEdit && notes !== (a.notes ?? "") && (
                 <div>
-                  <Button size="sm" onClick={() => patch({ notes })}>บันทึก</Button>
+                  <Button size="sm" loading={saving} onClick={() => patch({ notes })}>บันทึก</Button>
                 </div>
               )}
             </div>
@@ -234,7 +241,7 @@ export function ApplicantDetail({ id }: { id: number }) {
             {canEdit && (
               <div className="mb-3 flex gap-2">
                 <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="เพิ่มบันทึก เช่น โทรนัดแล้ว" onKeyDown={(e) => e.key === "Enter" && addNote()} className="h-9 text-sm" />
-                <Button size="sm" variant="secondary" onClick={addNote} disabled={!note.trim()}>เพิ่ม</Button>
+                <Button size="sm" variant="secondary" onClick={addNote} loading={noting} disabled={!note.trim()}>เพิ่ม</Button>
               </div>
             )}
             <ol className="relative ml-1.5 border-l border-line pl-4">

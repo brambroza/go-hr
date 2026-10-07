@@ -224,6 +224,7 @@ export function RequestDetailView({ id, mode = "mine" }: { id: number; mode?: "m
       toast.error("กรุณาระบุเหตุผลที่ไม่อนุมัติ");
       return;
     }
+    if (action === "reject" && !(await confirm(`ไม่อนุมัติเอกสาร ${r!.doc_no}? ผู้ยื่นจะได้รับแจ้งพร้อมเหตุผล`, { danger: true, confirmText: "ไม่อนุมัติ" }))) return;
     setBusy(action);
     const { error } = await supabaseBrowser().rpc("act_request", { p_request_id: r!.id, p_action: action, p_comment: comment.trim() || null });
     setBusy(null);

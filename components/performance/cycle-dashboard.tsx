@@ -72,9 +72,12 @@ export function CycleDashboard({ id }: { id: number }) {
   const compute = () => rpc("calc", "", () => sb.rpc("eval_cycle_compute", { p_cycle_id: id }), (n) => `คำนวณผลแล้ว ${n} คน`);
   async function setStatus(status: string) {
     if (status === "closed" && !(await confirm("ปิดรอบและประกาศผล? พนักงานจะเห็นผลการประเมินของตนเองและกดรับทราบได้ หลังปิดรอบแก้ไขคะแนนไม่ได้", { confirmText: "ปิดรอบและประกาศผล" }))) return;
+    if (status === "calibration" && !(await confirm("เปิดรอบที่ประกาศผลแล้วให้แก้ไขผลอีกครั้ง? พนักงานจะเห็นผลที่อาจเปลี่ยนแปลงหลังปิดรอบใหม่", { confirmText: "เปิดแก้ไขผล" }))) return;
+    setBusy("status");
     const { error } = await sb.from("eval_cycles").update({ status }).eq("id", id);
+    setBusy(null);
     if (error) return toast.error(humanError(error));
-    toast.ok(status === "closed" ? "ปิดรอบและประกาศผลแล้ว" : "เปลี่ยนสถานะแล้ว");
+    toast.ok(status === "closed" ? "ปิดรอบและประกาศผลแล้ว" : status === "open" ? "เปิดให้ประเมินแล้ว" : status === "calibration" ? "เปิดแก้ไขผลอีกครั้งแล้ว" : "เปลี่ยนสถานะแล้ว");
     load();
   }
 
@@ -88,7 +91,7 @@ export function CycleDashboard({ id }: { id: number }) {
     if (error) {
       toast.error(humanError(error));
       load();
-    }
+    } else toast.ok(`บันทึกผล “${k.name}” แล้ว`);
   }
   async function saveRes(r: Res, p: Partial<Res>) {
     setRes((x) => x.map((y) => (y.id === r.id ? { ...y, ...p } : y)));
@@ -96,7 +99,7 @@ export function CycleDashboard({ id }: { id: number }) {
     if (error) {
       toast.error(humanError(error));
       load();
-    }
+    } else toast.ok("บันทึกแล้ว");
   }
 
   const orgOf = (empId: number) => dir.byId.get(empId)?.org_unit_name ?? "ไม่ระบุหน่วยงาน";
@@ -143,11 +146,11 @@ export function CycleDashboard({ id }: { id: number }) {
           canEdit && (
             <>
               {!closed && <Button variant={asg.length ? "secondary" : "primary"} icon={<Sparkles className="size-4" />} loading={busy === "gen"} onClick={generate}>{asg.length ? "สร้างรายการเพิ่ม (พนักงานใหม่)" : "สร้างรายการประเมิน"}</Button>}
-              {c.status === "draft" && asg.length > 0 && <Button icon={<Unlock className="size-4" />} onClick={() => setStatus("open")}>เปิดให้ประเมิน</Button>}
+              {c.status === "draft" && asg.length > 0 && <Button icon={<Unlock className="size-4" />} loading={busy === "status"} onClick={() => setStatus("open")}>เปิดให้ประเมิน</Button>}
               {closed ? (
-                <Button variant="secondary" icon={<Unlock className="size-4" />} onClick={() => setStatus("calibration")}>เปิดแก้ไขผลอีกครั้ง</Button>
+                <Button variant="secondary" icon={<Unlock className="size-4" />} loading={busy === "status"} onClick={() => setStatus("calibration")}>เปิดแก้ไขผลอีกครั้ง</Button>
               ) : (
-                asg.length > 0 && <Button variant="secondary" icon={<Lock className="size-4" />} onClick={() => setStatus("closed")}>ปิดรอบและประกาศผล</Button>
+                asg.length > 0 && <Button variant="secondary" icon={<Lock className="size-4" />} loading={busy === "status"} onClick={() => setStatus("closed")}>ปิดรอบและประกาศผล</Button>
               )}
             </>
           )

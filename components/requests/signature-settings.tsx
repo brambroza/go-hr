@@ -65,7 +65,7 @@ export function SignatureSettings({ current, userId }: { current: string | null;
     <div className="flex flex-col gap-4">
       <Panel title="ลายเซ็นปัจจุบัน" actions={ref && <Button size="sm" variant="ghost" icon={<Trash2 className="size-4 text-rust" />} onClick={remove}>ลบลายเซ็น</Button>}>
         {ref ? (
-          <div className="grid h-36 place-items-center rounded-[var(--radius-ctl)] border border-dashed border-line bg-[repeating-conic-gradient(#f3f6f4_0_25%,#fff_0_50%)] bg-[length:16px_16px]">
+          <div className="grid h-36 place-items-center rounded-[var(--radius-ctl)] border border-dashed border-line bg-[repeating-conic-gradient(#f0f2f5_0_25%,#fff_0_50%)] bg-[length:16px_16px]">
             {preview ? (
                
               <img src={preview} alt="ลายเซ็นของฉัน" className="max-h-32 max-w-full object-contain" />
@@ -273,7 +273,7 @@ function UploadPad({ onSave, saving }: { onSave: (b: Blob, name: string) => void
             <input type="checkbox" className="size-4 accent-jade-600" checked={whiteToClear} onChange={(e) => setWhiteToClear(e.target.checked)} />
             ลบพื้นหลังสีขาวให้โปร่งใส (สำหรับรูปถ่าย/สแกนจากกระดาษ)
           </label>
-          <div className="grid h-36 place-items-center rounded-[var(--radius-ctl)] border border-line bg-[repeating-conic-gradient(#f3f6f4_0_25%,#fff_0_50%)] bg-[length:16px_16px]">
+          <div className="grid h-36 place-items-center rounded-[var(--radius-ctl)] border border-line bg-[repeating-conic-gradient(#f0f2f5_0_25%,#fff_0_50%)] bg-[length:16px_16px]">
             {url && (
                
               <img src={url} alt="ตัวอย่างลายเซ็น" className="max-h-32 max-w-full object-contain" />

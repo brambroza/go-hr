@@ -73,6 +73,7 @@ export function CourseBuilder({ id }: { id: number }) {
       if (!q.choices[q.answer]?.trim()) return toast.error(`แบบทดสอบข้อ ${i + 1} ยังไม่ได้เลือกคำตอบที่ถูก`);
     }
     if (next.is_published && !lessons.length) return toast.error("ต้องมีบทเรียนอย่างน้อย 1 บทก่อนเผยแพร่");
+    if (extra?.is_published === false && !(await confirm("ยกเลิกการเผยแพร่หลักสูตรนี้? พนักงานจะมองไม่เห็นหลักสูตรในแอปจนกว่าจะเผยแพร่อีกครั้ง", { confirmText: "ยกเลิกการเผยแพร่" }))) return;
     setBusy(true);
     const { id: _i, ...payload } = next;
     void _i;
@@ -93,6 +94,7 @@ export function CourseBuilder({ id }: { id: number }) {
     const res = lesson.id ? await sb.from("course_lessons").update(payload).eq("id", lesson.id) : await sb.from("course_lessons").insert(payload);
     setBusy(false);
     if (res.error) return toast.error(humanError(res.error));
+    toast.ok(lesson.id ? "บันทึกบทเรียนแล้ว" : "เพิ่มบทเรียนแล้ว");
     setLesson(null);
     load();
   }
@@ -101,12 +103,18 @@ export function CourseBuilder({ id }: { id: number }) {
     const [x] = a.splice(i, 1);
     a.splice(i + d, 0, x);
     setLessons(a);
-    await Promise.all(a.map((l, j) => sb.from("course_lessons").update({ sort_order: j + 1 }).eq("id", l.id)));
+    const res = await Promise.all(a.map((l, j) => sb.from("course_lessons").update({ sort_order: j + 1 }).eq("id", l.id)));
+    const failed = res.find((r) => r.error);
+    if (failed?.error) {
+      toast.error(humanError(failed.error));
+      load();
+    } else toast.ok("เรียงลำดับบทเรียนแล้ว");
   }
   async function removeLesson(l: Lesson) {
     if (!(await confirm(`ลบบทเรียน “${l.title}” ใช่หรือไม่?`, { danger: true, confirmText: "ลบ" }))) return;
     const { error } = await sb.from("course_lessons").delete().eq("id", l.id);
     if (error) return toast.error(humanError(error));
+    toast.ok("ลบบทเรียนแล้ว");
     load();
   }
 
@@ -144,9 +152,9 @@ export function CourseBuilder({ id }: { id: number }) {
             <>
               {dirty && <Button loading={busy} onClick={() => saveCourse()}>บันทึก</Button>}
               {c.is_published ? (
-                <Button variant="secondary" icon={<EyeOff className="size-4" />} onClick={() => saveCourse({ is_published: false })}>ยกเลิกการเผยแพร่</Button>
+                <Button variant="secondary" icon={<EyeOff className="size-4" />} loading={busy} onClick={() => saveCourse({ is_published: false })}>ยกเลิกการเผยแพร่</Button>
               ) : (
-                <Button variant={dirty ? "secondary" : "primary"} icon={<Eye className="size-4" />} onClick={() => saveCourse({ is_published: true })}>บันทึกและเผยแพร่</Button>
+                <Button variant={dirty ? "secondary" : "primary"} icon={<Eye className="size-4" />} loading={busy} onClick={() => saveCourse({ is_published: true })}>บันทึกและเผยแพร่</Button>
               )}
             </>
           )

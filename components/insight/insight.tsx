@@ -141,14 +141,14 @@ function Workforce({ dash, extra, turnover }: { dash: Dash; extra: Extra; turnov
           <ColumnChart
             labels={trend.map((m) => mLabel(m.month))}
             series={[
-              { name: "เข้าใหม่", values: trend.map((m) => m.hired), color: "#4ba383" },
-              { name: "ลาออก", values: trend.map((m) => m.resigned), color: "#b4441c" },
+              { name: "เข้าใหม่", values: trend.map((m) => m.hired), color: "#10b981" },
+              { name: "ลาออก", values: trend.map((m) => m.resigned), color: "#f43f5e" },
             ]}
           />
         </Panel>
         <Panel title="อัตราลาออกรายเดือน (%)">
           {turnoverTrend.some((v) => v > 0) ? (
-            <ColumnChart labels={trend.map((m) => mLabel(m.month))} series={[{ name: "อัตราลาออก %", values: turnoverTrend, color: "#8a5300" }]} format={(v) => `${v}%`} height={180} />
+            <ColumnChart labels={trend.map((m) => mLabel(m.month))} series={[{ name: "อัตราลาออก %", values: turnoverTrend, color: "#f59e0b" }]} format={(v) => `${v}%`} height={180} />
           ) : (
             <p className="py-10 text-center text-sm text-ink-mute">ไม่มีพนักงานลาออกในช่วง 12 เดือน</p>
           )}
@@ -209,9 +209,9 @@ function Cost({ payroll, year, setYear }: { payroll: Payroll | null; year: numbe
                 labels={TH_MONTHS_SHORT}
                 format={(v) => `${money(v, 0)} ฿`}
                 series={[
-                  { name: "รายได้พนักงาน", values: months.map((m) => Number(m?.income ?? 0)), color: "#1b6f53" },
-                  { name: "สปส. นายจ้าง", values: months.map((m) => Number(m?.sso_er ?? 0)), color: "#d8a24a" },
-                  { name: "PVD นายจ้าง", values: months.map((m) => Number(m?.pvd_er ?? 0)), color: "#3b6b8f" },
+                  { name: "รายได้พนักงาน", values: months.map((m) => Number(m?.income ?? 0)), color: "#10b981" },
+                  { name: "สปส. นายจ้าง", values: months.map((m) => Number(m?.sso_er ?? 0)), color: "#f59e0b" },
+                  { name: "PVD นายจ้าง", values: months.map((m) => Number(m?.pvd_er ?? 0)), color: "#0ea5e9" },
                 ]}
               />
             </Panel>
@@ -509,14 +509,14 @@ function Attendance({ extra }: { extra: Extra }) {
           <ColumnChart
             labels={rows.map((m) => mLabel(m.month))}
             series={[
-              { name: "มาสาย (ครั้ง)", values: rows.map((m) => m.late_count), color: "#d8a24a" },
-              { name: "ขาดงาน (วัน)", values: rows.map((m) => m.absent), color: "#b4441c" },
-              { name: "ลืมสแกน", values: rows.map((m) => m.missing_scan), color: "#7a8a84" },
+              { name: "มาสาย (ครั้ง)", values: rows.map((m) => m.late_count), color: "#f59e0b" },
+              { name: "ขาดงาน (วัน)", values: rows.map((m) => m.absent), color: "#f43f5e" },
+              { name: "ลืมสแกน", values: rows.map((m) => m.missing_scan), color: "#94a3b8" },
             ]}
           />
         </Panel>
         <Panel title="อัตรามาสาย (% ของวันทำงาน)">
-          <ColumnChart labels={rows.map((m) => mLabel(m.month))} series={[{ name: "มาสาย %", values: rows.map((m) => (m.work_days ? Math.round((m.late_count / m.work_days) * 1000) / 10 : 0)), color: "#8a5300" }]} format={(v) => `${v}%`} />
+          <ColumnChart labels={rows.map((m) => mLabel(m.month))} series={[{ name: "มาสาย %", values: rows.map((m) => (m.work_days ? Math.round((m.late_count / m.work_days) * 1000) / 10 : 0)), color: "#f59e0b" }]} format={(v) => `${v}%`} />
         </Panel>
       </div>
       <Panel title="สรุปรายเดือน" bodyClass="overflow-x-auto p-0">

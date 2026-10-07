@@ -78,27 +78,27 @@ export function EssHome() {
       <p className="mt-0.5 text-sm text-ink-mute">{dayLabel}</p>
 
       {/* Today */}
-      <section className="mt-4 overflow-hidden rounded-[var(--radius-panel)] bg-jade-800 text-white">
+      <section className="mt-4 overflow-hidden rounded-[var(--radius-panel)] border border-jade-100 bg-gradient-to-br from-jade-50 to-white text-ink">
         <div className="px-4 pb-4 pt-4">
           {loading ? (
-            <div className="grid h-24 place-items-center"><Spinner className="text-white" /></div>
+            <div className="grid h-24 place-items-center"><Spinner /></div>
           ) : (
             <>
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <div className="text-sm text-jade-200">{today ? DAY_TYPE_LABEL[today.day_type] : ""}{today?.holiday ? ` · ${today.holiday}` : ""}</div>
-                  <div className="num mt-0.5 text-[28px] font-semibold leading-none tracking-tight">
+                  <div className="text-sm text-ink-soft">{today ? DAY_TYPE_LABEL[today.day_type] : ""}{today?.holiday ? ` · ${today.holiday}` : ""}</div>
+                  <div className="num mt-0.5 text-[28px] font-semibold leading-none tracking-tight text-ink">
                     {today?.shift && isWorkDay ? `${today.shift.start_time} – ${today.shift.end_time}` : "วันหยุด"}
                   </div>
-                  {today?.shift && isWorkDay && <div className="mt-1 text-sm text-jade-200">{today.shift.name}</div>}
+                  {today?.shift && isWorkDay && <div className="mt-1 text-sm text-ink-mute">{today.shift.name}</div>}
                 </div>
                 <span
                   className={clsx(
                     "shrink-0 rounded-full px-2.5 py-1 text-xs font-medium",
-                    status.tone === "jade" && "bg-jade-500/30 text-white",
+                    status.tone === "jade" && "bg-jade-100 text-jade-800",
                     status.tone === "amber" && "bg-amber-50 text-amber-ink",
                     status.tone === "rust" && "bg-rust-soft text-rust",
-                    status.tone === "gray" && "bg-white/15 text-white",
+                    status.tone === "gray" && "bg-gray-100 text-ink-soft",
                   )}
                 >
                   {status.text}
@@ -106,19 +106,19 @@ export function EssHome() {
               </div>
               <div className="mt-3 flex flex-wrap gap-1.5">
                 {(today?.scans ?? []).map((s) => (
-                  <span key={s.id} className="num rounded-md bg-white/10 px-2 py-1 text-sm">
-                    {thTime(s.log_time)} <span className="text-jade-200">{DIRECTION_LABEL[s.direction]}</span>
+                  <span key={s.id} className="num rounded-lg border border-line bg-white px-2 py-1 text-sm">
+                    {thTime(s.log_time)} <span className="text-ink-mute">{DIRECTION_LABEL[s.direction]}</span>
                   </span>
                 ))}
-                {today && today.scans.length === 0 && <span className="text-sm text-jade-200">วันนี้ยังไม่มีเวลาเข้า–ออก</span>}
+                {today && today.scans.length === 0 && <span className="text-sm text-ink-mute">วันนี้ยังไม่มีเวลาเข้า–ออก</span>}
               </div>
               {today?.leave.filter((l) => l.status === "pending").map((l) => (
-                <div key={l.id} className="mt-2 text-sm text-amber-100">ใบลาวันนี้ ({l.leave_type}) กำลังรออนุมัติ</div>
+                <div key={l.id} className="mt-2 inline-block rounded-full bg-amber-50 px-2.5 py-0.5 text-sm text-amber-ink">ใบลาวันนี้ ({l.leave_type}) กำลังรออนุมัติ</div>
               ))}
             </>
           )}
         </div>
-        <Link href="/m/checkin" className="flex h-14 items-center justify-center gap-2 bg-jade-600 text-[17px] font-semibold active:bg-jade-700">
+        <Link href="/m/checkin" className="mx-3 mb-3 flex h-13 min-h-12 items-center justify-center gap-2 rounded-[var(--radius-ctl)] bg-jade-600 text-[17px] font-semibold text-white shadow-[var(--shadow-soft)] active:bg-jade-700">
           <Clock3 className="size-5" />
           {lastScan ? "ลงเวลา" : "ลงเวลาเข้างาน"}
         </Link>

@@ -322,6 +322,7 @@ function BulkModal({ open, groups, onClose, onDone, count }: { open: boolean; gr
     const r = await bulkCreateAccountsAction({ mode, password: pw, role_group_id: gid ? Number(gid) : null });
     setBusy(false);
     if (!r.ok) return toast.error(r.error);
+    toast.ok(`สร้างบัญชีผู้ใช้แล้ว ${r.data!.created.length} บัญชี`);
     setRes(r.data!);
     onDone();
   }

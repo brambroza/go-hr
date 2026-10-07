@@ -1,39 +1,44 @@
 @import "tailwindcss";
 
-/* GO HR design tokens
-   jade  — brand / primary actions (deep, calm green for a back-office tool used all day)
-   ink   — body text
-   paper — app background (cool, slightly green-grey, never cream)
+/* GO HR design tokens — light, minimal, modern
+   jade  — the one brand accent (fresh emerald, base #10b981). 600 is the primary button
+           (#04835d, 4.8:1 with white text); 50/100 are pale tints for selected/active states
+   ink   — neutral slate text (never green-tinted)
+   paper — app background (very light neutral grey); surfaces are white
    amber — "waiting for someone" states (pending approvals, missing scans)
    rust  — problems (late, absent, rejected, errors)                                  */
 @theme {
   --font-sans: "IBM Plex Sans Thai", "Noto Sans Thai", "Leelawadee UI", Tahoma, sans-serif;
 
-  --color-jade-50: #eef7f3;
-  --color-jade-100: #d8ede4;
-  --color-jade-200: #b1dbca;
-  --color-jade-300: #7fc2a8;
-  --color-jade-400: #4ba383;
-  --color-jade-500: #2a8767;
-  --color-jade-600: #1b6f53;
-  --color-jade-700: #165a44;
-  --color-jade-800: #134837;
-  --color-jade-900: #0f3a2d;
-  --color-jade-950: #082119;
+  --color-jade-50: #ecfdf5;
+  --color-jade-100: #d1fae5;
+  --color-jade-200: #a7f3d0;
+  --color-jade-300: #6ee7b7;
+  --color-jade-400: #34d399;
+  --color-jade-500: #10b981;
+  --color-jade-600: #04835d;
+  --color-jade-700: #046c4e;
+  --color-jade-800: #065f46;
+  --color-jade-900: #064e3b;
+  --color-jade-950: #022c22;
 
-  --color-ink: #1d2a26;
-  --color-ink-soft: #4a5a54;
-  --color-ink-mute: #7a8a84;
-  --color-paper: #f3f6f4;
-  --color-line: #dbe3df;
-  --color-line-soft: #e9eeeb;
+  --color-ink: #111827;
+  --color-ink-soft: #4b5563;
+  --color-ink-mute: #6b7280;
+  --color-paper: #f7f8fa;
+  --color-line: #e5e7eb;
+  --color-line-soft: #f0f2f5;
 
-  --color-amber-ink: #8a5300;
-  --color-rust: #b4441c;
-  --color-rust-soft: #fbece5;
+  --color-amber-ink: #92400e;
+  --color-rust: #c53030;
+  --color-rust-soft: #fef2f2;
 
-  --radius-ctl: 0.5rem;
-  --radius-panel: 0.75rem;
+  --radius-ctl: 0.625rem;
+  --radius-panel: 0.875rem;
+  --radius-md: 0.5rem;
+
+  --shadow-soft: 0 1px 2px rgb(16 24 40 / 0.04), 0 1px 3px rgb(16 24 40 / 0.04);
+  --shadow-pop: 0 12px 32px -8px rgb(16 24 40 / 0.14), 0 2px 6px rgb(16 24 40 / 0.05);
 }
 
 :root {
@@ -46,6 +51,12 @@ body {
   color: var(--color-ink);
   font-family: var(--font-sans);
   font-feature-settings: "tnum" 0;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: var(--color-jade-100);
+  color: var(--color-ink);
 }
 
 /* numbers in tables / money always align */
@@ -54,7 +65,7 @@ body {
 }
 
 :focus-visible {
-  outline: 2px solid var(--color-jade-500);
+  outline: 2px solid var(--color-jade-600);
   outline-offset: 2px;
 }
 
@@ -86,6 +97,27 @@ body {
     size: A4;
     margin: 12mm;
   }
+}
+
+/* toasts slide in (disabled by the reduced-motion rule above) */
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.toast-in {
+  animation: toast-in 0.18s ease-out;
+}
+
+/* modal backdrop: light, slightly blurred */
+dialog::backdrop {
+  background: rgb(17 24 39 / 0.28);
+  backdrop-filter: blur(2px);
 }
 
 /* scrollbars inside data tables */

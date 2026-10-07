@@ -34,6 +34,7 @@ lib/storage.ts            uploadFile(bucket, file), signedUrl(ref), resizeImage(
 lib/csv.ts                downloadCsv, parseCsv
 lib/attendance/engine.ts  computeDay(), summarize()           (pure, tests in tests/)
 lib/payroll/{engine,tax}.ts  computeEntry(), monthlyWithholding(), ssoContribution()
+lib/payroll/files.ts      bank / SSO / RD export files: data-driven layouts + TIS-620 (see docs/GOV-BANK-FILES.md)
 supabase/migrations       schema (read these first — table & function names are the API)
 supabase/seed.sql         base master data;  scripts/seed-demo.ts  demo company
 ```
@@ -64,8 +65,22 @@ Supervisors (anyone with subordinates) see their team even without HR permission
 
 - Thai UI, plain sentence-style labels, buttons say exactly what they do ("บันทึก", "อนุมัติ", "คำนวณเงินเดือน").
   No ALL-CAPS labels, no decorative eyebrows. Errors say what went wrong and how to fix it.
-- Colors (Tailwind tokens): `jade-50…950` (brand / primary), `ink`, `ink-soft`, `ink-mute`, `paper` (page bg),
-  `line`, `line-soft`, `amber-ink` + `amber-50` (pending), `rust` + `rust-soft` (problems). Use `num` class for numbers.
+- Look: light, minimal, modern — white surfaces on a very light neutral page (`paper` #f7f8fa), soft neutral borders
+  (`line` #e5e7eb, `line-soft` #f0f2f5), `rounded-[var(--radius-panel)]` (14px) for panels, `--radius-ctl` (10px) for controls,
+  `shadow-[var(--shadow-soft)]` on cards, `shadow-[var(--shadow-pop)]` on popovers/modals. No dark blocks (sidebar, heroes,
+  kiosk are light). Print pages stay black-on-white.
+- Colors (Tailwind tokens in `app/globals.css`): ONE accent `jade-50…950` = emerald scale based on #10b981 (`jade-500`);
+  primary buttons `jade-600` #04835d (white text, 4.8:1), selected/active = `bg-jade-50 text-jade-700` pale pill.
+  Text is neutral slate: `ink` #111827, `ink-soft` #4b5563, `ink-mute` #6b7280 (never green-tinted grey).
+  Status pills (`Badge`): amber = pending (`amber-50` + `amber-ink`), red = problems (`rust-soft` #fef2f2 + `rust` #c53030),
+  blue = info (`sky-50` + `sky-800`). Charts use the light palette in `components/charts.tsx`. Use `num` class for numbers.
+- Feedback on every mutating action (save / delete / edit / approve / submit / upload …):
+  button shows `loading` while working; success → `toast.ok("บันทึกแล้ว")` naming what happened; failure →
+  `toast.error(err)` (raw Postgres/RLS/server-action text is translated by `errorText()` — never show raw JSON);
+  destructive or hard-to-undo actions ask first with `useConfirm()` (`{ danger: true }` for deletes).
+  `runAction(fn, { success, confirm, setBusy })` in `components/ui` wraps the whole pattern. One `<Toaster />` is mounted in
+  `app/layout.tsx` (top-right desktop, top-center phone, rendered in the top layer so it shows above open modals) —
+  do not mount another.
 - Page = `PageHeader` + `Panel`s. Tables: hairline rows, `text-[14px]`. Mobile pages (`/m`) are single-column, big tap targets.
 - Dates are shown in พ.ศ. via `thDate()`; store ISO `YYYY-MM-DD`. Times are Asia/Bangkok.
 - Simple master tables: use `CrudPage` (see `app/(admin)/org/branches/page.tsx`).

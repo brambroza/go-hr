@@ -62,8 +62,8 @@ export default async function DashboardPage() {
               <ColumnChart
                 labels={s.headcount_trend.map((m) => TH_MONTHS_SHORT[Number(m.month.slice(5)) - 1])}
                 series={[
-                  { name: "เข้าใหม่", values: s.headcount_trend.map((m) => m.hired), color: "#4ba383" },
-                  { name: "ลาออก", values: s.headcount_trend.map((m) => m.resigned), color: "#b4441c" },
+                  { name: "เข้าใหม่", values: s.headcount_trend.map((m) => m.hired), color: "#10b981" },
+                  { name: "ลาออก", values: s.headcount_trend.map((m) => m.resigned), color: "#f43f5e" },
                 ]}
               />
             </Panel>

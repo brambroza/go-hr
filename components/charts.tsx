@@ -3,7 +3,8 @@
 
 import { useState } from "react";
 
-const PALETTE = ["#1b6f53", "#4ba383", "#b1dbca", "#8a5300", "#b4441c", "#3b6b8f", "#7a8a84", "#d8a24a"];
+// fresh, light palette that reads well on white (emerald accent first)
+const PALETTE = ["#10b981", "#38bdf8", "#f59e0b", "#fb7185", "#a78bfa", "#2dd4bf", "#94a3b8", "#f97316"];
 
 export function BarList({ data, valueFormat = (v: number) => v.toLocaleString("th-TH"), max }: { data: { name: string; value: number }[]; valueFormat?: (v: number) => string; max?: number }) {
   const m = max ?? Math.max(1, ...data.map((d) => d.value));
@@ -30,7 +31,7 @@ export function Donut({ data, size = 140 }: { data: { name: string; value: numbe
   return (
     <div className="flex items-center gap-4">
       <svg viewBox="0 0 120 120" width={size} height={size} className="shrink-0 -rotate-90">
-        <circle cx="60" cy="60" r={r} fill="none" stroke="#e9eeeb" strokeWidth="14" />
+        <circle cx="60" cy="60" r={r} fill="none" stroke="#f0f2f5" strokeWidth="14" />
         {data.map((d, i) => {
           const len = (d.value / total) * c;
           return <circle key={d.name} cx="60" cy="60" r={r} fill="none" stroke={PALETTE[i % PALETTE.length]} strokeWidth="14" strokeDasharray={`${len} ${c - len}`} strokeDashoffset={-offsets[i]} />;
@@ -67,15 +68,15 @@ export function ColumnChart({ labels, series, height = 200, format = (v: number)
     <div className="relative">
       <svg viewBox={`0 0 ${w} ${h}`} className="w-full" role="img">
         {[0.25, 0.5, 0.75, 1].map((f) => (
-          <line key={f} x1={pad.l} x2={w - pad.r} y1={y(max * f)} y2={y(max * f)} stroke="#e9eeeb" />
+          <line key={f} x1={pad.l} x2={w - pad.r} y1={y(max * f)} y2={y(max * f)} stroke="#f0f2f5" />
         ))}
         {labels.map((l, i) => (
           <g key={l} onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(null)}>
-            <rect x={pad.l + i * cw} y={pad.t} width={cw} height={h - pad.t - pad.b} fill={hover === i ? "#eef7f3" : "transparent"} />
+            <rect x={pad.l + i * cw} y={pad.t} width={cw} height={h - pad.t - pad.b} fill={hover === i ? "#f7f8fa" : "transparent"} />
             {bars.map((s, j) => (
-              <rect key={s.name} x={pad.l + i * cw + cw * 0.15 + j * bw} y={y(s.values[i] ?? 0)} width={bw - 2} height={Math.max(0, h - pad.b - y(s.values[i] ?? 0))} rx="2" fill={s.color ?? PALETTE[j]} />
+              <rect key={s.name} x={pad.l + i * cw + cw * 0.15 + j * bw} y={y(s.values[i] ?? 0)} width={bw - 2} height={Math.max(0, h - pad.b - y(s.values[i] ?? 0))} rx="3" fill={s.color ?? PALETTE[j]} />
             ))}
-            <text x={pad.l + i * cw + cw / 2} y={h - 8} textAnchor="middle" fontSize="11" fill="#7a8a84">{l}</text>
+            <text x={pad.l + i * cw + cw / 2} y={h - 8} textAnchor="middle" fontSize="11" fill="#6b7280">{l}</text>
           </g>
         ))}
         {lines.map((s, j) => (
@@ -89,7 +90,7 @@ export function ColumnChart({ labels, series, height = 200, format = (v: number)
         ))}
       </svg>
       {hover !== null && (
-        <div className="pointer-events-none absolute left-1/2 top-0 -translate-x-1/2 rounded-md border border-line bg-white px-3 py-1.5 text-xs shadow">
+        <div className="pointer-events-none absolute left-1/2 top-0 -translate-x-1/2 rounded-lg border border-line bg-white px-3 py-1.5 text-xs shadow-[var(--shadow-pop)]">
           <div className="font-medium">{labels[hover]}</div>
           {series.map((s) => (
             <div key={s.name} className="num text-ink-soft">{s.name}: {format(s.values[hover] ?? 0)}</div>

@@ -105,17 +105,17 @@ export function QrScanner({ onResult, paused }: { onResult: (text: string) => vo
 
   if (error) {
     return (
-      <div className="flex aspect-square w-full flex-col items-center justify-center gap-2 rounded-[var(--radius-panel)] bg-jade-950 px-6 text-center text-jade-100">
-        <CameraOff className="size-8 text-jade-300" />
+      <div className="flex aspect-square w-full flex-col items-center justify-center gap-2 rounded-[var(--radius-panel)] border border-line bg-paper px-6 text-center text-ink-soft">
+        <CameraOff className="size-8 text-ink-mute" />
         <p className="text-[15px]">{error}</p>
       </div>
     );
   }
   return (
-    <div className="relative aspect-square w-full overflow-hidden rounded-[var(--radius-panel)] bg-jade-950">
+    <div className="relative aspect-square w-full overflow-hidden rounded-[var(--radius-panel)] bg-gray-900">
       <video ref={video} playsInline muted className="absolute inset-0 size-full object-cover" />
-      <div className="pointer-events-none absolute inset-[14%] rounded-2xl border-[3px] border-white/85 shadow-[0_0_0_999px_rgba(8,33,25,0.45)]" />
-      {!ready && <p className="absolute inset-x-0 bottom-4 text-center text-sm text-jade-100">กำลังเปิดกล้อง…</p>}
+      <div className="pointer-events-none absolute inset-[14%] rounded-2xl border-[3px] border-white/85 shadow-[0_0_0_999px_rgba(17,24,39,0.45)]" />
+      {!ready && <p className="absolute inset-x-0 bottom-4 text-center text-sm text-white/90">กำลังเปิดกล้อง…</p>}
       {ready && <p className="absolute inset-x-0 bottom-3 text-center text-sm text-white/90">เล็ง QR Code ที่จอลงเวลาให้อยู่ในกรอบ</p>}
     </div>
   );

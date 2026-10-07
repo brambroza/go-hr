@@ -2,7 +2,6 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { computeLeavePay, expandLeaveRequest, type LeaveTypeRule } from "../lib/payroll/leave";
 import { computeCommission, loanSchedule, loanTotals } from "../lib/payroll/commission";
-import { buildBankFile, buildRdPrepFile, buildSsoFile, encodeTis620, padNum, padText, BANK_FORMATS, SSO_DETAIL, SSO_HEADER } from "../lib/payroll/files";
 
 const types: Record<number, LeaveTypeRule> = {
   1: { is_paid: true, paid_days_limit: 30, pay_rate_percent: 100, name: "ลาป่วย" },
@@ -82,65 +81,4 @@ test("loan: flat interest totals and schedule", () => {
   assert.equal(s[1].paid, false);
 });
 
-test("fixed width helpers + TIS-620", () => {
-  assert.equal(padNum("12-34", 6), "001234");
-  assert.equal(padText("ab", 4), "ab  ");
-  assert.equal(padText("abcdef", 3), "abc");
-  const b = encodeTis620("ก A");
-  assert.deepEqual([...b], [0xa1, 0x20, 0x41]);
-});
-
-const ctx = { company_name: "บริษัท ทดสอบ จำกัด", company_bank_code: "014", company_account: "123-4-56789-0", company_id: "C001", effective_date: "2026-09-30", batch_ref: "PR2609" };
-const rows = [
-  { emp_code: "E0001", name: "สมชาย ใจดี", bank_code: "014", account: "111-2-33333-4", amount: 15234.5 },
-  { emp_code: "E0002", name: "สมหญิง รักงาน", bank_code: "004", account: "2223334445", amount: 9000 },
-  { emp_code: "E0003", name: "zero", bank_code: "004", account: "1", amount: 0 },
-];
-
-test("bank files: every fixed format has constant line widths and correct totals", () => {
-  for (const f of BANK_FORMATS) {
-    const out = buildBankFile(f.key, ctx, rows);
-    assert.equal(out.count, 2, f.key);
-    assert.equal(out.total, 24234.5, f.key);
-    const lines = out.text.trimEnd().split("\r\n");
-    if (f.kind === "fixed") {
-      assert.equal(lines.length, 4, f.key);
-      const dw = f.detail!.reduce((s, x) => s + x.len, 0);
-      assert.equal(lines[1].length, dw, `${f.key} detail width`);
-      assert.equal(lines[2].length, dw);
-      assert.ok(lines[1].includes("1523450"), `${f.key} satang`);
-      assert.equal(out.bytes.length, out.text.length, "TIS-620 is 1 byte per char");
-    } else {
-      assert.equal(lines.length, 3, f.key);
-    }
-  }
-  const scb = buildBankFile("scb", ctx, rows).text.split("\r\n");
-  assert.equal(scb[0].slice(0, 9), "H30092026");
-  assert.equal(scb[1].slice(0, 7), "D000001");
-  assert.equal(scb[1].slice(7, 10), "014");
-  assert.equal(scb[1].slice(10, 21), "01112333334");
-  assert.equal(scb[3], "T000002000000002423450");
-});
-
-test("SSO file layout", () => {
-  const f = buildSsoFile({ account_no: "1000123456", branch_no: "000000", pay_date: "2026-10-07", year: 2026, month: 9, company_name: "บริษัท ทดสอบ", rate: 5 }, [
-    { sso_no: "1-1037-00123-45-1", prefix: "นาย", first_name: "สมชาย", last_name: "ใจดี", wage: 17500, employee: 875, employer: 875 },
-    { sso_no: "3101700234567", prefix: "นางสาว", first_name: "สมหญิง", last_name: "รักงาน", wage: 9360, employee: 468, employer: 468 },
-  ]);
-  const lines = f.text.trimEnd().split("\r\n");
-  assert.equal(lines.length, 3);
-  assert.equal(lines[0].length, SSO_HEADER.reduce((s, x) => s + x.len, 0));
-  assert.equal(lines[1].length, SSO_DETAIL.reduce((s, x) => s + x.len, 0));
-  assert.equal(lines[0].slice(0, 17), "11000123456000000");
-  assert.equal(lines[0].slice(17, 23), "071069");
-  assert.equal(lines[0].slice(23, 27), "0969");
-  assert.equal(lines[1].slice(1, 14), "1103700123451");
-  assert.equal(lines[1].slice(14, 17), "003");
-  assert.equal(lines[2].slice(14, 17), "004");
-  assert.equal(f.total, 2686);
-});
-
-test("RD Prep pipe file", () => {
-  const f = buildRdPrepFile("pnd1.txt", [{ tax_id: "1-1037-00123-45-1", prefix: "นาย", first_name: "สมชาย", last_name: "ใจดี", pay_date: "2026-09-30", income: 30000, tax: 312.5 }]);
-  assert.equal(f.text.trimEnd(), "1|1103700123451|00000|นาย|สมชาย|ใจดี|1|30/09/2569|30000.00|312.50|1");
-});
+// export file builders (bank / SSO / RD) are tested in tests/payroll-files.test.ts

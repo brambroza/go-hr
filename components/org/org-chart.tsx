@@ -311,12 +311,12 @@ const TREE_CSS = `/* Top-down org tree with hairline connectors */
   right: 50%;
   width: 50%;
   height: 20px;
-  border-top: 1px solid #7fc2a8;
+  border-top: 1px solid #a7f3d0;
 }
 .gohr-orgtree li::after {
   right: auto;
   left: 50%;
-  border-left: 1px solid #7fc2a8;
+  border-left: 1px solid #a7f3d0;
 }
 .gohr-orgtree li:only-child::before,
 .gohr-orgtree li:only-child::after {
@@ -333,7 +333,7 @@ const TREE_CSS = `/* Top-down org tree with hairline connectors */
   border: 0 none;
 }
 .gohr-orgtree li:last-child::before {
-  border-right: 1px solid #7fc2a8;
+  border-right: 1px solid #a7f3d0;
   border-radius: 0 6px 0 0;
 }
 .gohr-orgtree li:first-child::after {
@@ -346,7 +346,7 @@ const TREE_CSS = `/* Top-down org tree with hairline connectors */
   top: 0;
   left: 50%;
   height: 20px;
-  border-left: 1px solid #7fc2a8;
+  border-left: 1px solid #a7f3d0;
 }
 /* stem for the only child */
 .gohr-orgtree li:only-child > .gohr-orgnode::before {
@@ -355,7 +355,7 @@ const TREE_CSS = `/* Top-down org tree with hairline connectors */
   top: -20px;
   left: 50%;
   height: 20px;
-  border-left: 1px solid #7fc2a8;
+  border-left: 1px solid #a7f3d0;
 }
 .gohr-orgtree > li:only-child > .gohr-orgnode::before {
   display: none;

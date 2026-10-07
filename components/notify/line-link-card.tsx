@@ -39,12 +39,15 @@ export function LineLinkCard({ className }: { className?: string }) {
     const r = await createLineLinkCodeAction();
     setBusy(false);
     if (!r.ok) return toast.error(r.error);
+    toast.ok("สร้างรหัสเชื่อม LINE แล้ว");
     setS((x) => (x ? { ...x, pending: r.data as { code: string; expires: string } } : x));
   };
 
   const unlink = async () => {
     if (!(await confirm("ยกเลิกการเชื่อม LINE? คุณจะไม่ได้รับแจ้งเตือนทาง LINE", { danger: true, confirmText: "ยกเลิกการเชื่อม" }))) return;
+    setBusy(true);
     const r = await unlinkLineAction();
+    setBusy(false);
     if (!r.ok) return toast.error(r.error);
     toast.ok(r.message ?? "ยกเลิกแล้ว");
     load();
@@ -68,7 +71,7 @@ export function LineLinkCard({ className }: { className?: string }) {
       ) : !s.enabled && !s.linked ? (
         <p className="mt-3 rounded-[var(--radius-ctl)] bg-paper px-3 py-2 text-sm text-ink-soft">บริษัทยังไม่ได้เปิดใช้การแจ้งเตือนทาง LINE</p>
       ) : s.linked ? (
-        <Button variant="secondary" className="mt-3 h-11 w-full" icon={<Unlink className="size-4" />} onClick={unlink}>ยกเลิกการเชื่อม LINE</Button>
+        <Button variant="secondary" className="mt-3 h-11 w-full" icon={<Unlink className="size-4" />} onClick={unlink} loading={busy}>ยกเลิกการเชื่อม LINE</Button>
       ) : s.pending && !expired ? (
         <div className="mt-3 flex flex-col gap-3">
           <ol className="list-decimal space-y-1 pl-5 text-[15px] text-ink-soft">

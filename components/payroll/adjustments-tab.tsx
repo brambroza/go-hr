@@ -56,6 +56,7 @@ export function AdjustmentsTab({ periodId, editable, onChanged }: { periodId: nu
     if (!(await confirm("ลบรายการนี้ใช่หรือไม่?", { danger: true, confirmText: "ลบ" }))) return;
     const { error } = await sb.from("payroll_adjustments").delete().eq("id", r.id);
     if (error) return toast.error(humanError(error));
+    toast.ok("ลบรายการแล้ว");
     load();
     onChanged();
   }

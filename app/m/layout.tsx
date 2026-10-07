@@ -5,7 +5,6 @@ import { requireMe } from "@/lib/auth";
 import { isBackOffice } from "@/lib/permissions";
 import { getCompany } from "@/lib/settings";
 import { MeProvider } from "@/components/app/me-context";
-import { Toaster } from "@/components/ui";
 import { EssShell } from "@/components/ess/shell";
 
 export const metadata: Metadata = {
@@ -15,7 +14,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#1b6f53",
+  themeColor: "#ffffff",
   width: "device-width",
   initialScale: 1,
   viewportFit: "cover",
@@ -56,7 +55,6 @@ export default async function EssLayout({ children }: LayoutProps<"/m">) {
       <EssShell company={{ name: company.name, logo_url: company.logo_url ?? null }} backOffice={backOffice}>
         {children}
       </EssShell>
-      <Toaster />
     </MeProvider>
   );
 }

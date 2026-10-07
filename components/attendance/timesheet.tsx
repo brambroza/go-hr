@@ -136,7 +136,7 @@ export function Timesheet({ employeeId, month, companyName }: { employeeId: numb
                         <td className="num whitespace-nowrap px-2 py-1.5">
                           <span className={clsx("inline-block w-7", (wd === 0 || wd === 6) && "text-rust")}>{TH_DAYS_SHORT[wd]}</span> {thDate(date)}
                         </td>
-                        <td className="px-2 py-1.5">{s ? <ShiftChip code={s.code} color={nonWork ? "#dbe3df" : s.color} /> : "-"}</td>
+                        <td className="px-2 py-1.5">{s ? <ShiftChip code={s.code} color={nonWork ? "#e5e7eb" : s.color} /> : "-"}</td>
                         <td className={clsx("num px-2 py-1.5", (d?.late_minutes ?? 0) > 0 && "font-medium text-amber-ink")}>{thTime(d?.actual_in)}</td>
                         <td className={clsx("num px-2 py-1.5", (d?.early_minutes ?? 0) > 0 && "font-medium text-amber-ink")}>{thTime(d?.actual_out)}</td>
                         <td className="num px-2 py-1.5 text-right">{minutesToHM(d?.work_minutes)}</td>

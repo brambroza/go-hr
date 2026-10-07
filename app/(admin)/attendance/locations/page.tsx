@@ -7,7 +7,7 @@ import QRCode from "qrcode";
 import { LocateFixed, MonitorSmartphone, Network, Printer, QrCode, RefreshCw } from "lucide-react";
 import { type Row } from "@/components/crud/crud-page";
 import { useCan } from "@/components/app/me-context";
-import { Badge, Button, Input, Modal, toast, useConfirm } from "@/components/ui";
+import { Badge, Button, Input, Modal, errorText, toast, useConfirm } from "@/components/ui";
 import { getQrSecretAction, regenerateQrSecretAction } from "@/lib/attendance/actions";
 import { QrSvg } from "@/components/attendance/qr";
 import { invalidateAttLookups } from "@/components/attendance/lookups";
@@ -102,6 +102,7 @@ export default function LocationsPage() {
   const [poster, setPoster] = useState<{ row: Row; secret: string } | null>(null);
   const [loading, setLoading] = useState<number | null>(null);
   const { confirm, dialog } = useConfirm();
+  const [regenBusy, setRegenBusy] = useState(false);
 
   async function openPoster(row: Row) {
     setLoading(Number(row.id));
@@ -114,8 +115,9 @@ export default function LocationsPage() {
   async function regenerate() {
     if (!poster) return;
     if (!(await confirm("สร้างรหัส QR ใหม่? โปสเตอร์ QR ที่พิมพ์ติดไว้เดิมจะใช้ลงเวลาไม่ได้อีก ต้องพิมพ์ใหม่", { danger: true, confirmText: "สร้างใหม่" }))) return;
-    const r = await regenerateQrSecretAction(Number(poster.row.id));
-    if (!r.ok) return toast.error(r.error);
+    setRegenBusy(true);
+    const r = await regenerateQrSecretAction(Number(poster.row.id)).finally(() => setRegenBusy(false));
+    if (!r.ok) return toast.error(errorText(r.error));
     toast.ok(r.message ?? "สร้างใหม่แล้ว");
     setPoster({ ...poster, secret: r.data! });
   }
@@ -217,7 +219,7 @@ export default function LocationsPage() {
         title="QR ลงเวลา"
         footer={
           <>
-            <Button variant="ghost" className="mr-auto" icon={<RefreshCw className="size-4" />} onClick={regenerate}>สร้างรหัสใหม่</Button>
+            <Button variant="ghost" className="mr-auto" icon={<RefreshCw className="size-4" />} onClick={regenerate} loading={regenBusy}>สร้างรหัสใหม่</Button>
             <a href="/attendance/devices" className="inline-flex h-10 items-center gap-1.5 rounded-[var(--radius-ctl)] border border-line px-4 text-[15px] hover:bg-jade-50">
               <MonitorSmartphone className="size-4" /> ตั้งค่าจอ Kiosk (QR หมุนเวียน)
             </a>
@@ -247,13 +249,13 @@ export default function LocationsPage() {
 async function printPoster(name: string, value: string) {
   const w = window.open("", "_blank", "width=800,height=1000");
   if (!w) return toast.error("เบราว์เซอร์บล็อกหน้าต่างใหม่ — อนุญาต pop-up แล้วลองใหม่");
-  const svg = await QRCode.toString(value, { type: "svg", errorCorrectionLevel: "M", margin: 1, color: { dark: "#082119", light: "#ffffff" } });
+  const svg = await QRCode.toString(value, { type: "svg", errorCorrectionLevel: "M", margin: 1, color: { dark: "#111827", light: "#ffffff" } });
   const esc = (t: string) => t.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
   w.document.write(`<!doctype html><html lang="th"><head><meta charset="utf-8"><title>QR ลงเวลา ${esc(name)}</title>
-<style>body{font-family:"IBM Plex Sans Thai","Noto Sans Thai",Tahoma,sans-serif;display:flex;justify-content:center;padding:20mm 10mm;color:#082119}
-.p{border:3px solid #134837;border-radius:16px;padding:14mm;text-align:center;width:150mm}.s{font-size:20px;color:#4a5a54}
-.t{font-size:34px;font-weight:600;margin:6px 0 12px}svg{width:115mm;height:115mm}ol{text-align:left;font-size:17px;color:#4a5a54;display:inline-block;padding-left:20px}
-.n{font-size:12px;color:#7a8a84}@page{size:A4;margin:10mm}</style></head>
+<style>body{font-family:"IBM Plex Sans Thai","Noto Sans Thai",Tahoma,sans-serif;display:flex;justify-content:center;padding:20mm 10mm;color:#111827}
+.p{border:3px solid #10b981;border-radius:16px;padding:14mm;text-align:center;width:150mm}.s{font-size:20px;color:#4b5563}
+.t{font-size:34px;font-weight:600;margin:6px 0 12px}svg{width:115mm;height:115mm}ol{text-align:left;font-size:17px;color:#4b5563;display:inline-block;padding-left:20px}
+.n{font-size:12px;color:#6b7280}@page{size:A4;margin:10mm}</style></head>
 <body><div class="p"><div class="s">สแกนเพื่อลงเวลาเข้า-ออกงาน</div><div class="t">${esc(name)}</div>${svg}
 <ol><li>เปิดแอป GO HR บนมือถือ แล้วกด “ลงเวลา”</li><li>เลือก “สแกน QR” แล้วส่องที่รูปนี้</li></ol>
 <div class="n">ใช้ได้เฉพาะในแอป GO HR ของบริษัท</div></div><script>window.onload=()=>setTimeout(()=>window.print(),200)</script></body></html>`);

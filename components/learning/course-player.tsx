@@ -64,6 +64,7 @@ export function CoursePlayer({ courseId }: { courseId: number }) {
     const { error } = await sb.rpc("course_enroll_self", { p_course_id: courseId });
     setBusy(false);
     if (error) return toast.error(humanError(error));
+    toast.ok("ลงทะเบียนเรียนแล้ว");
     await load();
     setView({ kind: "lesson", i: 0 });
   }
@@ -270,7 +271,10 @@ function Quiz({ course, enr, onFinished }: { course: Course; enr: Enr | null; on
     const { data, error } = await sb.rpc("course_submit_quiz", { p_course_id: course.id, p_answers: answers });
     setBusy(false);
     if (error) return toast.error(humanError(error));
-    setResult(data as typeof result);
+    const qr = data as NonNullable<typeof result>;
+    if (qr.passed) toast.ok(`ส่งคำตอบแล้ว — ผ่าน ${qr.score}%`);
+    else toast.info(`ส่งคำตอบแล้ว — ได้ ${qr.score}% ยังไม่ผ่านเกณฑ์`);
+    setResult(qr);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 

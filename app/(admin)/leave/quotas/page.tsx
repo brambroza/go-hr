@@ -6,7 +6,7 @@ import { ChevronLeft, ChevronRight, Download, Search, Sparkles } from "lucide-re
 import { supabaseBrowser } from "@/lib/supabase/client";
 import { useCan } from "@/components/app/me-context";
 import { humanError } from "@/components/crud/crud-page";
-import { Button, Checkbox, Empty, Field, Input, Modal, PageHeader, Panel, Select, Spinner, Textarea, clsx, toast } from "@/components/ui";
+import { Button, Checkbox, Empty, Field, Input, Modal, PageHeader, Panel, Select, Spinner, Textarea, clsx, toast, useConfirm } from "@/components/ui";
 import { downloadCsv } from "@/lib/csv";
 import { generateQuotasAction } from "@/lib/attendance/actions";
 import { FilterBar, MiniField } from "@/components/attendance/bits";
@@ -175,6 +175,7 @@ export default function LeaveQuotasPage() {
 function EditQuota({ year, emp, lt, b, onClose, onSaved }: { year: number; emp: EmpOpt; lt: LT; b: Bal | null; onClose: () => void; onSaved: () => void }) {
   const [v, setV] = useState({ quota: fmt(b?.quota_days ?? lt.default_quota_days), carried: fmt(b?.carried_days ?? 0), adjust: fmt(b?.adjust_days ?? 0), note: "" });
   const [busy, setBusy] = useState(false);
+  const { confirm, dialog } = useConfirm();
   useEffect(() => {
     if (!b) return;
     supabaseBrowser().from("leave_quotas").select("id, note").eq("id", b.id).maybeSingle().then(({ data }: { data: unknown }) => setV((x) => ({ ...x, note: (data as Quota | null)?.note ?? "" })));
@@ -194,6 +195,7 @@ function EditQuota({ year, emp, lt, b, onClose, onSaved }: { year: number; emp: 
   }
   async function remove() {
     if (!b) return;
+    if (!(await confirm(`ลบสิทธิ์${lt.name}ปี ${year + 543} ของพนักงานคนนี้? ระบบจะกลับไปใช้สิทธิ์ตั้งต้นของประเภทการลา`, { danger: true, confirmText: "ลบสิทธิ์" }))) return;
     setBusy(true);
     const { error } = await supabaseBrowser().from("leave_quotas").delete().eq("id", b.id);
     setBusy(false);
@@ -218,6 +220,7 @@ function EditQuota({ year, emp, lt, b, onClose, onSaved }: { year: number; emp: 
         <div><dt className="text-xs text-ink-soft">คงเหลือ</dt><dd className={clsx("num font-semibold", total - n(b?.used_days) - n(b?.pending_days) < 0 && "text-rust")}>{fmt(total - n(b?.used_days) - n(b?.pending_days))}</dd></div>
       </dl>
       <Field label="หมายเหตุการปรับ" className="mt-3"><Textarea value={v.note} onChange={(e) => setV({ ...v, note: e.target.value })} placeholder="เช่น ให้เพิ่มตามผลงาน / ชดเชยวันหยุด" /></Field>
+      {dialog}
     </Modal>
   );
 }

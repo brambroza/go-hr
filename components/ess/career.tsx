@@ -47,14 +47,14 @@ export function CareerView() {
 
   return (
     <>
-      <section className="rounded-[var(--radius-panel)] bg-jade-800 px-4 py-4 text-white">
-        <div className="text-sm text-jade-200">ตำแหน่งปัจจุบัน</div>
+      <section className="rounded-[var(--radius-panel)] border border-jade-100 bg-gradient-to-br from-jade-50 to-white px-4 py-4 text-ink">
+        <div className="text-sm text-ink-soft">ตำแหน่งปัจจุบัน</div>
         <div className="text-[22px] font-semibold leading-tight">{pos.name}</div>
-        <div className="mt-1 text-sm text-jade-200">
+        <div className="mt-1 text-sm text-ink-soft">
           ระดับ {pos.job_level}
           {pos.job_grade ? ` · เกรด ${pos.job_grade}` : ""} · อายุงาน {serviceText(hire)}
         </div>
-        {pos.description && <p className="mt-2 text-sm text-jade-100">{pos.description}</p>}
+        {pos.description && <p className="mt-2 text-sm text-ink-soft">{pos.description}</p>}
       </section>
 
       {paths.length === 0 ? (

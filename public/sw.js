@@ -3,7 +3,7 @@
  * - Pages (navigations): network-first, cached copy when offline, else /m/offline.
  * - Never cache API traffic: /rest/v1, /auth/v1, /storage/v1, /api/*, server actions / RSC requests.
  */
-const VERSION = "gohr-v1";
+const VERSION = "gohr-v2";
 const SHELL = `${VERSION}-shell`;
 const PAGES = `${VERSION}-pages`;
 const OFFLINE_URL = "/m/offline";

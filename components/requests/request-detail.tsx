@@ -7,7 +7,7 @@ import { supabaseBrowser } from "@/lib/supabase/client";
 import { signedUrl } from "@/lib/storage";
 import { money, minutesToHM, num, thDate, thDateTime, thTime, bahtText } from "@/lib/format";
 import { useCan, useMaybeMe } from "@/components/app/me-context";
-import { Badge, Button, Field, Spinner, Textarea, clsx, toast } from "@/components/ui";
+import { Badge, Button, Field, Spinner, Textarea, clsx, toast, useConfirm } from "@/components/ui";
 import { DIRECTION, DOC_LANG, LEAVE_UNIT, REQUEST_STATUS, STEP_STATUS, empName, errMsg, isPrintable, normalizeAttachments, type RequestRow } from "./lib";
 
 export interface RequestDetailProps {
@@ -48,6 +48,7 @@ export function RequestDetail({ requestId, onChanged, actions = "none" }: Reques
   const [comment, setComment] = useState("");
   const [busy, setBusy] = useState<"approve" | "reject" | "cancel" | null>(null);
   const [cancelMode, setCancelMode] = useState(false);
+  const { confirm, dialog } = useConfirm();
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -73,6 +74,7 @@ export function RequestDetail({ requestId, onChanged, actions = "none" }: Reques
 
   async function act(action: "approve" | "reject") {
     if (action === "reject" && !comment.trim()) return toast.error("กรุณาระบุเหตุผลที่ไม่อนุมัติ");
+    if (action === "reject" && !(await confirm(`ไม่อนุมัติเอกสาร ${row?.doc_no ?? ""}? ผู้ยื่นจะได้รับแจ้งพร้อมเหตุผลที่ระบุ`, { danger: true, confirmText: "ไม่อนุมัติ" }))) return;
     setBusy(action);
     const { error } = await sb.rpc("act_request", { p_request_id: requestId, p_action: action, p_comment: comment.trim() || null });
     setBusy(null);
@@ -85,6 +87,7 @@ export function RequestDetail({ requestId, onChanged, actions = "none" }: Reques
 
   async function cancel() {
     if (!comment.trim()) return toast.error("กรุณาระบุเหตุผลที่ยกเลิก");
+    if (!(await confirm(`ยกเลิกเอกสาร ${row?.doc_no ?? ""}? ${row?.status === "approved" ? "เอกสารที่อนุมัติแล้วจะถูกยกเลิก และระบบจะคืนผลที่เกี่ยวข้อง (เช่น วันลา)" : "เอกสารจะหยุดการอนุมัติทันที"}`, { danger: true, confirmText: "ยกเลิกเอกสาร" }))) return;
     setBusy("cancel");
     const { error } = await sb.rpc("cancel_request", { p_request_id: requestId, p_reason: comment.trim() });
     setBusy(null);
@@ -206,6 +209,7 @@ export function RequestDetail({ requestId, onChanged, actions = "none" }: Reques
           </div>
         </section>
       )}
+      {dialog}
     </div>
   );
 }

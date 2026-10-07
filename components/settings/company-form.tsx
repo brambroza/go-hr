@@ -31,6 +31,7 @@ export function CompanyForm() {
       const blob = f.type === "image/svg+xml" ? f : await resizeImage(f, 512, 0.9);
       const r = await uploadFile("public", blob, { folder: "company", name: f.type === "image/svg+xml" ? "logo.svg" : "logo.jpg" });
       set({ logo_url: r.url });
+      toast.ok("อัปโหลดโลโก้แล้ว กด “บันทึก” เพื่อใช้งาน");
     } catch (e) {
       toast.error(`อัปโหลดโลโก้ไม่สำเร็จ: ${(e as Error).message}`);
     } finally {

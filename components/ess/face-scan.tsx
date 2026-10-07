@@ -176,10 +176,10 @@ export function FaceCamera({
 
   if (phase === "error") {
     return (
-      <div className={clsx("flex w-full flex-col items-center justify-center gap-3 rounded-[var(--radius-panel)] bg-jade-950 px-6 text-center text-jade-100", aspectClass)}>
-        <CameraOff className="size-8 text-jade-300" />
+      <div className={clsx("flex w-full flex-col items-center justify-center gap-3 rounded-[var(--radius-panel)] border border-line bg-paper px-6 text-center text-ink-soft", aspectClass)}>
+        <CameraOff className="size-8 text-ink-mute" />
         <p className="text-[15px]">{error}</p>
-        <button className="inline-flex h-10 items-center gap-1.5 rounded-full border border-jade-700 px-4 text-sm text-white active:bg-jade-900" onClick={() => setNonce((n) => n + 1)}>
+        <button className="inline-flex h-10 items-center gap-1.5 rounded-full border border-line bg-white px-4 text-sm text-ink active:bg-paper" onClick={() => setNonce((n) => n + 1)}>
           <RefreshCw className="size-4" /> ลองอีกครั้ง
         </button>
       </div>
@@ -208,7 +208,7 @@ export function FaceCamera({
 
   return (
     <div>
-      <div className={clsx("relative w-full overflow-hidden rounded-[var(--radius-panel)] bg-jade-950", aspectClass)}>
+      <div className={clsx("relative w-full overflow-hidden rounded-[var(--radius-panel)] bg-gray-900", aspectClass)}>
         <video ref={video} playsInline muted className="absolute inset-0 size-full -scale-x-100 object-cover" />
         {/* guide circle */}
         <div
@@ -222,7 +222,7 @@ export function FaceCamera({
             <ScanFace className="size-12 text-jade-300 motion-safe:animate-pulse" />
           </div>
         )}
-        <div aria-live="polite" className="absolute inset-x-3 top-3 rounded-[var(--radius-ctl)] bg-jade-950/80 px-3 py-2.5 text-center text-[15px] font-medium text-white">
+        <div aria-live="polite" className="absolute inset-x-3 top-3 rounded-[var(--radius-ctl)] bg-gray-900/75 px-3 py-2.5 backdrop-blur-sm text-center text-[15px] font-medium text-white">
           {instruction}
           {hint && phase === "scanning" && <div className="mt-0.5 text-sm font-normal text-amber-200">{hint}</div>}
         </div>
@@ -242,7 +242,7 @@ export function FaceCamera({
           disabled={phase !== "scanning" || !good || paused}
           className={clsx(
             "mt-3 flex h-12 w-full items-center justify-center gap-2 rounded-[var(--radius-ctl)] text-[15px] font-semibold text-white",
-            phase === "scanning" && good && !paused ? "bg-jade-600 active:bg-jade-800" : "bg-jade-300",
+            phase === "scanning" && good && !paused ? "bg-jade-600 active:bg-jade-800" : "bg-jade-100 !text-jade-800",
           )}
         >
           <ScanFace className="size-5" /> {phase === "processing" ? "กำลังประมวลผล…" : captureLabel}

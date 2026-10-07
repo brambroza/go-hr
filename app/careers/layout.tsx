@@ -19,7 +19,7 @@ export default async function CareersLayout({ children }: LayoutProps<"/careers"
                
               <img src={c.logo_url} alt="" className="size-9 rounded-md object-contain" />
             ) : (
-              <span className="grid size-9 place-items-center rounded-md bg-jade-700 text-white">
+              <span className="grid size-9 place-items-center rounded-lg bg-jade-500 text-white">
                 <Briefcase className="size-5" />
               </span>
             )}

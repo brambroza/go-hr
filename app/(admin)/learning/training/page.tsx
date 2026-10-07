@@ -41,6 +41,7 @@ export default function TrainingPage() {
     return { y: n.getFullYear(), m: n.getMonth() + 1 };
   });
   const [edit, setEdit] = useState<(ReturnType<typeof blank> & { id?: number }) | null>(null);
+  const [marking, setMarking] = useState(false);
   const [open, setOpen] = useState<S | null>(null);
   const [att, setAtt] = useState<At[]>([]);
   const [addOrg, setAddOrg] = useState("");
@@ -84,6 +85,7 @@ export default function TrainingPage() {
     if (!(await confirm(`ลบรอบอบรม “${s.title}” และรายชื่อผู้เข้าอบรมทั้งหมดใช่หรือไม่?`, { danger: true, confirmText: "ลบ" }))) return;
     const { error } = await sb.from("training_sessions").delete().eq("id", s.id);
     if (error) return toast.error(humanError(error));
+    toast.ok("ลบรอบอบรมแล้ว");
     load();
   }
 
@@ -104,22 +106,28 @@ export default function TrainingPage() {
     if (error) {
       toast.error(humanError(error));
       if (open) loadAtt(open.id);
+      return;
     }
+    toast.ok(p.status ? `บันทึกสถานะ “${ATTENDEE_STATUS[p.status]}” แล้ว` : "บันทึกแล้ว");
     if (p.status) load();
   }
   async function markAll(status: string) {
     if (!open) return;
     const ids = att.filter((a) => a.status === "registered").map((a) => a.id);
     if (!ids.length) return;
+    setMarking(true);
     const { error } = await sb.from("training_attendees").update({ status }).in("id", ids);
+    setMarking(false);
     if (error) return toast.error(humanError(error));
     toast.ok(status === "attended" ? "บันทึกว่าเข้าอบรมครบ และเพิ่มในประวัติการอบรมของพนักงานแล้ว" : "บันทึกแล้ว");
     loadAtt(open.id);
     load();
   }
   async function removeAtt(a: At) {
+    if (!(await confirm("เอาพนักงานคนนี้ออกจากรายชื่อผู้เข้าอบรมใช่หรือไม่?", { danger: true, confirmText: "เอาออก" }))) return;
     const { error } = await sb.from("training_attendees").delete().eq("id", a.id);
     if (error) return toast.error(humanError(error));
+    toast.ok("เอาออกจากรายชื่อแล้ว");
     if (open) loadAtt(open.id);
     load();
   }
@@ -292,7 +300,7 @@ export default function TrainingPage() {
                 <Button variant="secondary" disabled={!addOrg} onClick={() => (addPeople(dir.rows.filter((r) => r.status !== "resigned" && String(r.org_unit_id) === addOrg).map((r) => r.id)), setAddOrg(""))}>เพิ่มหน่วยงาน</Button>
                 <div className="ml-auto flex gap-2">
                   <Button variant="secondary" icon={<Download className="size-4" />} onClick={() => downloadCsv(`training-${open.id}.csv`, [["ลำดับ", "รหัส", "ชื่อ-สกุล", "ตำแหน่ง", "หน่วยงาน", "สถานะ", "คะแนนก่อน", "คะแนนหลัง", "ความเห็น", "ลายมือชื่อ"], ...att.map((a, i) => { const r = dir.byId.get(a.employee_id); return [i + 1, r?.code, dir.name(a.employee_id), r?.position_name, r?.org_unit_name, ATTENDEE_STATUS[a.status], a.pre_score, a.post_score, a.feedback, ""]; })])}>ใบลงชื่อ (CSV)</Button>
-                  <Button onClick={() => markAll("attended")} disabled={!att.some((a) => a.status === "registered")}>เช็คชื่อเข้าอบรมทั้งหมด</Button>
+                  <Button onClick={() => markAll("attended")} loading={marking} disabled={!att.some((a) => a.status === "registered")}>เช็คชื่อเข้าอบรมทั้งหมด</Button>
                 </div>
               </div>
             )}

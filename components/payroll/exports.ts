@@ -2,38 +2,10 @@
 // Export helpers for a payroll period (client side; data already loaded under RLS)
 
 import { downloadCsv } from "@/lib/csv";
-import { BANK_NAMES, buildBankFile, downloadBuilt } from "@/lib/payroll/files";
+import { BANK_NAMES } from "@/lib/payroll/files";
 import { fetchRowsIn } from "@/lib/payroll/fetch";
 import { supabaseBrowser } from "@/lib/supabase/client";
 import type { Entry, EntryItem, PeriodFull } from "./types";
-
-export async function exportBankFile(format: string, period: PeriodFull, entries: Entry[]) {
-  const sb = supabaseBrowser();
-  const [{ data: pay }, { data: comp }] = await Promise.all([
-    sb.from("settings").select("value").eq("key", "payroll").maybeSingle(),
-    sb.from("settings").select("value").eq("key", "company").maybeSingle(),
-  ]);
-  const bank = ((pay?.value as Record<string, unknown>)?.company_bank ?? {}) as { bank_code?: string; account?: string; company_id?: string };
-  const bankRows = entries.filter((e) => e.pay_method === "bank" && Number(e.net_pay) > 0);
-  // account names come from employee_private (requires employee_private view); fall back to the payslip name
-  const names = new Map<number, string>();
-  try {
-    const priv = await fetchRowsIn<{ employee_id: number; bank_account_name: string | null }>(bankRows.map((e) => e.employee_id), (part) =>
-      sb.from("employee_private").select("employee_id, bank_account_name").in("employee_id", part).order("employee_id"),
-    );
-    for (const p of priv) if (p.bank_account_name) names.set(p.employee_id, p.bank_account_name);
-  } catch {
-    /* no permission → snapshot names */
-  }
-  const missing = bankRows.filter((e) => !e.bank_account);
-  const f = buildBankFile(
-    format,
-    { company_name: String((comp?.value as Record<string, unknown>)?.name ?? ""), company_bank_code: bank.bank_code ?? "", company_account: bank.account ?? "", company_id: bank.company_id, effective_date: period.pay_date, batch_ref: period.code },
-    bankRows.filter((e) => e.bank_account).map((e) => ({ emp_code: e.emp_code, name: names.get(e.employee_id) ?? e.emp_name.replace(/^(นาย|นางสาว|นาง)/, ""), bank_code: e.bank_code ?? "", account: e.bank_account ?? "", amount: Number(e.net_pay) })),
-  );
-  downloadBuilt(f);
-  return { count: f.count, total: f.total, missing: missing.length };
-}
 
 export async function exportRegister(period: PeriodFull, entries: Entry[], orgName: (id: number | null) => string) {
   const sb = supabaseBrowser();

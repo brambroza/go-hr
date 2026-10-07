@@ -96,5 +96,5 @@ export function textOn(hex: string | null | undefined): string {
   const h = (hex ?? "#10b981").replace("#", "");
   const n = parseInt(h.length === 3 ? h.split("").map((c) => c + c).join("") : h, 16);
   const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
-  return (r * 299 + g * 587 + b * 114) / 1000 > 150 ? "#1d2a26" : "#ffffff";
+  return (r * 299 + g * 587 + b * 114) / 1000 > 150 ? "#111827" : "#ffffff";
 }

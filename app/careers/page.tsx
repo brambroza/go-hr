@@ -24,13 +24,13 @@ export default async function CareersPage({ searchParams }: PageProps<"/careers"
 
   return (
     <main>
-      <section className="bg-jade-900 text-white">
+      <section className="border-b border-jade-100 bg-gradient-to-b from-jade-50 to-white text-ink">
         <div className="mx-auto max-w-5xl px-4 py-10 sm:py-14">
           <h1 className="text-[28px] font-semibold leading-tight sm:text-4xl">ร่วมเป็นส่วนหนึ่งของ {company.name}</h1>
-          <p className="mt-3 max-w-2xl text-[15px] text-jade-100 sm:text-base">
+          <p className="mt-3 max-w-2xl text-[15px] text-ink-soft sm:text-base">
             เปิดรับสมัคร {jobs.length} ตำแหน่ง สมัครออนไลน์ได้ทันทีจากมือถือ ไม่ต้องสมัครสมาชิก ฝ่ายบุคคลจะติดต่อกลับทางโทรศัพท์หรืออีเมล
           </p>
-          <form className="mt-6 grid gap-2 rounded-[var(--radius-panel)] bg-white p-2 sm:grid-cols-[1fr_auto_auto_auto]" action="/careers">
+          <form className="mt-6 grid gap-2 rounded-[var(--radius-panel)] border border-line bg-white p-2 shadow-[var(--shadow-soft)] sm:grid-cols-[1fr_auto_auto_auto]" action="/careers">
             <label className="relative">
               <span className="sr-only">ค้นหาตำแหน่ง</span>
               <Search className="pointer-events-none absolute left-3 top-1/2 size-5 -translate-y-1/2 text-ink-mute" />
