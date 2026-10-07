@@ -1,6 +1,7 @@
 import "server-only";
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
+import { AUTH_COOKIE } from "./cookie";
 
 /** Supabase client for Server Components / Server Actions / Route Handlers (user session → RLS applies). */
 export async function supabaseServer() {
@@ -9,6 +10,7 @@ export async function supabaseServer() {
     process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
+      cookieOptions: AUTH_COOKIE,
       cookies: {
         getAll() {
           return cookieStore.getAll();

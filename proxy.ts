@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
+import { AUTH_COOKIE } from "@/lib/supabase/cookie";
 
 // Paths that work without a signed-in user
 const PUBLIC_PREFIXES = ["/login", "/forgot-password", "/reset-password", "/careers", "/kiosk", "/api/public", "/api/cron", "/api/device", "/api/line", "/manifest.webmanifest", "/sw.js", "/icons"];
@@ -11,6 +12,7 @@ export async function proxy(request: NextRequest) {
     process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
+      cookieOptions: AUTH_COOKIE,
       cookies: {
         getAll() {
           return request.cookies.getAll();
