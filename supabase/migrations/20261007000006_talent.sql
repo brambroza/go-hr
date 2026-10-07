@@ -7,7 +7,7 @@
 -- ---------------------------------------------------------------------
 create table public.job_postings (
   id              bigint generated always as identity primary key,
-  slug            text not null unique default encode(gen_random_bytes(5), 'hex'),
+  slug            text not null unique default app.rand_hex(5),
   title           text not null,
   position_id     bigint references public.positions(id),
   org_unit_id     bigint references public.org_units(id),

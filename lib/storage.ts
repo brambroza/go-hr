@@ -1,5 +1,6 @@
 "use client";
 import { supabaseBrowser } from "./supabase/client";
+import { publicEnv } from "./public-env";
 
 export type Bucket = "public" | "avatars" | "documents" | "attachments" | "checkins" | "resumes";
 
@@ -28,7 +29,7 @@ export async function signedUrl(ref: string | null | undefined, expiresIn = 3600
   const [bucket, ...rest] = ref.split("/");
   const { data } = await supabaseBrowser().storage.from(bucket).createSignedUrl(rest.join("/"), expiresIn);
   if (!data?.signedUrl) return null;
-  return data.signedUrl.startsWith("http") ? data.signedUrl : `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1${data.signedUrl}`;
+  return data.signedUrl.startsWith("http") ? data.signedUrl : `${publicEnv().supabaseUrl}/storage/v1${data.signedUrl}`;
 }
 
 /** Resize an image in the browser before upload (photos from phones are large) */

@@ -1,0 +1,23 @@
+# GOHR_DOMAIN: a public domain (automatic Let's Encrypt certificate), e.g. hr.company.co.th
+#              or an IP / LAN name — then TLS_MODE=internal issues a self-signed certificate
+{$GOHR_DOMAIN} {
+	tls {$TLS_MODE:internal}
+	encode zstd gzip
+
+	# Supabase API on the same origin (no CORS, one certificate)
+	@supabase path /auth/v1/* /rest/v1/* /storage/v1/* /realtime/v1/*
+	handle @supabase {
+		reverse_proxy kong:8000
+	}
+
+	handle {
+		reverse_proxy app:3000
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		Permissions-Policy "geolocation=(self), camera=(self)"
+	}
+}

@@ -1,6 +1,7 @@
 "use client";
 import { createBrowserClient } from "@supabase/ssr";
 import { AUTH_COOKIE } from "./cookie";
+import { publicEnv } from "../public-env";
 
 let client: ReturnType<typeof createBrowserClient> | undefined;
 
@@ -8,8 +9,8 @@ let client: ReturnType<typeof createBrowserClient> | undefined;
 export function supabaseBrowser() {
   if (!client) {
     client = createBrowserClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      publicEnv().supabaseUrl,
+      publicEnv().anonKey,
       { cookieOptions: AUTH_COOKIE },
     );
   }

@@ -7,6 +7,16 @@ create extension if not exists pgcrypto;
 create schema if not exists app;
 grant usage on schema app to anon, authenticated, service_role;
 
+-- pgcrypto lives in schema "extensions" on Supabase and in "public" on plain Postgres:
+-- wrap the two functions we need so the rest of the schema works with any search_path.
+do $$
+declare s text;
+begin
+  select n.nspname into s from pg_extension e join pg_namespace n on n.oid = e.extnamespace where e.extname = 'pgcrypto';
+  execute format($f$create or replace function app.rand_hex(n int) returns text language sql volatile as 'select encode(%I.gen_random_bytes(n), ''hex'')'$f$, s);
+  execute format($f$create or replace function app.hmac_hex(msg text, key text) returns text language sql immutable as 'select encode(%I.hmac(msg, key, ''sha256''), ''hex'')'$f$, s);
+end $$;
+
 -- ---------------------------------------------------------------------
 -- updated_at trigger
 -- ---------------------------------------------------------------------

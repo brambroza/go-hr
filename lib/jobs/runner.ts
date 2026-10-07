@@ -22,8 +22,10 @@ const RECO: Reco = { probation_remind_days: [30, 15, 7], contract_remind_days: [
 
 // ------------------------------------------------------------------------------------------------ jobs
 const JOBS: Record<JobCode, (c: Ctx) => Promise<string>> = {
-  async attendance_calc({ today }) {
-    const a = await recalcAttendance({ from: plusDays(today, -1), to: today });
+  async attendance_calc({ today, job }) {
+    // params.days: how many days back to (re)calculate every run (default: yesterday + today)
+    const back = Math.max(1, Math.min(62, Number(job.params?.days ?? 1) || 1));
+    const a = await recalcAttendance({ from: plusDays(today, -back), to: today });
     let dirty = { days: 0 };
     try {
       dirty = await recalcAttendance({ from: plusDays(today, -35), to: plusDays(today, -2), onlyDirty: true });

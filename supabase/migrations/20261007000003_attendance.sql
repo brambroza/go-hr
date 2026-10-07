@@ -100,7 +100,7 @@ create table public.work_locations (
   wifi_ssids   text[],
   wifi_bssids  text[],
   beacon_uuids text[],
-  qr_secret    text not null default encode(gen_random_bytes(16), 'hex'),
+  qr_secret    text not null default app.rand_hex(16),
   allow_gps    boolean not null default true,
   allow_wifi   boolean not null default true,
   allow_beacon boolean not null default false,
@@ -122,7 +122,7 @@ create table public.time_devices (
   ip_address   text,
   branch_id    bigint references public.branches(id),
   location_id  bigint references public.work_locations(id),
-  api_key      text not null default encode(gen_random_bytes(24), 'hex'),
+  api_key      text not null default app.rand_hex(24),
   last_seen_at timestamptz,
   is_active    boolean not null default true,
   created_at   timestamptz not null default now(),
@@ -305,7 +305,7 @@ begin
     if array_length(v_parts,1) = 3 then
       select * into v_loc from work_locations where id = v_parts[1]::bigint and is_active and allow_qr;
       if found and abs(extract(epoch from now())/60 - v_parts[2]::bigint) <= 2
-         and encode(hmac(v_parts[1] || '.' || v_parts[2], v_loc.qr_secret, 'sha256'), 'hex') = v_parts[3] then
+         and app.hmac_hex(v_parts[1] || '.' || v_parts[2], v_loc.qr_secret) = v_parts[3] then
         v_ok := true;
       end if;
     elsif array_length(v_parts,1) = 2 then
@@ -385,6 +385,6 @@ begin
   if not app.has_perm('attendance','view') then raise exception 'forbidden'; end if;
   select qr_secret into v_secret from work_locations where id = p_location_id and is_active;
   if v_secret is null then raise exception 'ไม่พบจุดลงเวลา'; end if;
-  return p_location_id || '.' || v_min || '.' || encode(hmac(p_location_id || '.' || v_min, v_secret, 'sha256'), 'hex');
+  return p_location_id || '.' || v_min || '.' || app.hmac_hex(p_location_id || '.' || v_min, v_secret);
 end $$;
 revoke all on function public.kiosk_qr_token from anon;

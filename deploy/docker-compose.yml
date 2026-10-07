@@ -1,0 +1,47 @@
+# GO HR application stack. Supabase runs from its own official compose project (deploy/supabase, created by install.sh);
+# this stack joins Supabase's docker network to reach Kong (API gateway) as http://kong:8000.
+name: gohr
+
+services:
+  app:
+    image: ${GOHR_IMAGE:-gohr/app:latest}
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      SUPABASE_URL: http://kong:8000
+    networks: [default, supabase]
+
+  # Calls the scheduler endpoint every minute (attendance calculation, reminders, LINE/e-mail dispatch, automation ...)
+  cron:
+    image: alpine:3.20
+    restart: unless-stopped
+    env_file: .env
+    command: >
+      sh -c "apk add --no-cache curl tzdata >/dev/null &&
+             while true; do curl -fsS -m 300 -H \"authorization: Bearer $$CRON_SECRET\" http://app:3000/api/cron >/dev/null || echo cron-failed; sleep 60; done"
+    depends_on: [app]
+
+  # HTTPS reverse proxy — one origin for the web app and the Supabase API (needed for GPS check-in on phones)
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports: ["80:80", "443:443"]
+    env_file: .env
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks: [default, supabase]
+    depends_on: [app]
+
+networks:
+  supabase:
+    external: true
+    name: ${SUPABASE_NETWORK:-supabase_default}
+
+volumes:
+  caddy_data:
+  caddy_config:
