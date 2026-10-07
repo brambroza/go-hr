@@ -1,0 +1,99 @@
+@import "tailwindcss";
+
+/* GO HR design tokens
+   jade  — brand / primary actions (deep, calm green for a back-office tool used all day)
+   ink   — body text
+   paper — app background (cool, slightly green-grey, never cream)
+   amber — "waiting for someone" states (pending approvals, missing scans)
+   rust  — problems (late, absent, rejected, errors)                                  */
+@theme {
+  --font-sans: "IBM Plex Sans Thai", "Noto Sans Thai", "Leelawadee UI", Tahoma, sans-serif;
+
+  --color-jade-50: #eef7f3;
+  --color-jade-100: #d8ede4;
+  --color-jade-200: #b1dbca;
+  --color-jade-300: #7fc2a8;
+  --color-jade-400: #4ba383;
+  --color-jade-500: #2a8767;
+  --color-jade-600: #1b6f53;
+  --color-jade-700: #165a44;
+  --color-jade-800: #134837;
+  --color-jade-900: #0f3a2d;
+  --color-jade-950: #082119;
+
+  --color-ink: #1d2a26;
+  --color-ink-soft: #4a5a54;
+  --color-ink-mute: #7a8a84;
+  --color-paper: #f3f6f4;
+  --color-line: #dbe3df;
+  --color-line-soft: #e9eeeb;
+
+  --color-amber-ink: #8a5300;
+  --color-rust: #b4441c;
+  --color-rust-soft: #fbece5;
+
+  --radius-ctl: 0.5rem;
+  --radius-panel: 0.75rem;
+}
+
+:root {
+  color-scheme: light;
+}
+
+html,
+body {
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-feature-settings: "tnum" 0;
+}
+
+/* numbers in tables / money always align */
+.num {
+  font-variant-numeric: tabular-nums;
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-jade-500);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* print: documents / payslips / government forms */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  html,
+  body {
+    background: white;
+  }
+  .print-page {
+    box-shadow: none !important;
+    border: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  @page {
+    size: A4;
+    margin: 12mm;
+  }
+}
+
+/* scrollbars inside data tables */
+.thin-scroll::-webkit-scrollbar {
+  height: 8px;
+  width: 8px;
+}
+.thin-scroll::-webkit-scrollbar-thumb {
+  background: var(--color-line);
+  border-radius: 8px;
+}
