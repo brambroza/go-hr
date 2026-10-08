@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { requirePerm, safeAction, type ActionResult } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabase/admin";
-import { parseLeave, parseYtd, type CsvTable } from "./import";
+import { orgSaveOrder, parseLeave, parseOrg, parseYtd, type CsvTable } from "./import";
 
 export interface MigrationStatus {
   year: number;
@@ -89,12 +89,72 @@ export async function setMigrationStepAction(step: string, done: boolean): Promi
 }
 
 /** codes only — used by the browser preview to flag unknown employees / leave types */
-export async function migrationRefsAction(): Promise<ActionResult<{ employees: string[]; leaveTypes: string[] }>> {
+export async function migrationRefsAction(): Promise<ActionResult<{ employees: string[]; leaveTypes: string[]; branches: string[]; orgs: string[] }>> {
   return safeAction(async () => {
     await requirePerm("settings");
     const sb = supabaseAdmin();
-    const [e, t] = await Promise.all([sb.from("employees").select("code"), sb.from("leave_types").select("code")]);
-    return { employees: (e.data ?? []).map((x) => x.code as string), leaveTypes: (t.data ?? []).map((x) => x.code as string) };
+    const [e, t, b, o] = await Promise.all([sb.from("employees").select("code"), sb.from("leave_types").select("code"), sb.from("branches").select("code"), sb.from("org_units").select("code")]);
+    const codes = (r: { data: { code: unknown }[] | null }) => (r.data ?? []).map((x) => String(x.code));
+    return { employees: codes(e), leaveTypes: codes(t), branches: codes(b), orgs: codes(o) };
+  });
+}
+
+/** branches, org units and positions from one CSV (upsert by code) */
+export async function importOrgAction(table: CsvTable): Promise<ActionResult<ImportSummary>> {
+  return safeAction(async () => {
+    const me = await requirePerm("org", "create");
+    if (!Array.isArray(table) || table.length < 2) throw new Error("ไม่มีข้อมูลที่จะนำเข้า");
+    if (table.length > MAX_ROWS + 1) throw new Error(`นำเข้าได้ครั้งละไม่เกิน ${MAX_ROWS.toLocaleString()} แถว`);
+    const sb = supabaseAdmin();
+    const load = async (t: "branches" | "org_units") => {
+      const { data, error } = await sb.from(t).select("id, code");
+      if (error) throw new Error(error.message);
+      return new Map((data ?? []).map((x) => [String(x.code).toLowerCase(), Number(x.id)]));
+    };
+    const branchId = await load("branches");
+    const orgId = await load("org_units");
+    const { rows, missing } = parseOrg(table, { branches: new Set(branchId.keys()), orgs: new Set(orgId.keys()) });
+    if (missing.length) throw new Error(`ไฟล์ไม่มีคอลัมน์ ${missing.join(", ")}`);
+    const res: ImportSummary = { saved: 0, failed: [] };
+    for (const r of orgSaveOrder(rows)) {
+      if (r.errors.length) {
+        res.failed.push({ line: r.line, code: r.code, error: r.errors.join(", ") });
+        continue;
+      }
+      let error: { message: string } | null = null;
+      if (r.kind === "branch") {
+        const row: Record<string, unknown> = { code: r.code, name: r.name, is_head_office: r.head_office };
+        if (r.tax_branch_no) row.tax_branch_no = r.tax_branch_no;
+        if (r.sso_account_no) row.sso_account_no = r.sso_account_no;
+        if (r.sso_branch_no) row.sso_branch_no = r.sso_branch_no;
+        const q = await sb.from("branches").upsert(row, { onConflict: "code" }).select("id").single();
+        error = q.error;
+        if (q.data) branchId.set(r.code.toLowerCase(), Number(q.data.id));
+      } else if (r.kind === "org") {
+        const row: Record<string, unknown> = { code: r.code, name: r.name, parent_id: r.parent ? orgId.get(r.parent.toLowerCase()) ?? null : null, branch_id: r.branch ? branchId.get(r.branch.toLowerCase()) ?? null : null };
+        if (r.unit_type) row.unit_type = r.unit_type;
+        if (r.parent && !row.parent_id) {
+          res.failed.push({ line: r.line, code: r.code, error: `บันทึกหน่วยงานแม่ “${r.parent}” ไม่สำเร็จ` });
+          continue;
+        }
+        const q = await sb.from("org_units").upsert(row, { onConflict: "code" }).select("id").single();
+        error = q.error;
+        if (q.data) orgId.set(r.code.toLowerCase(), Number(q.data.id));
+      } else {
+        const row: Record<string, unknown> = { code: r.code, name: r.name, org_unit_id: r.unit ? orgId.get(r.unit.toLowerCase()) ?? null : null };
+        if (r.job_level !== null) row.job_level = r.job_level;
+        if (r.min_salary !== null) row.min_salary = r.min_salary;
+        if (r.max_salary !== null) row.max_salary = r.max_salary;
+        const q = await sb.from("positions").upsert(row, { onConflict: "code" }).select("id").single();
+        error = q.error;
+      }
+      if (error) res.failed.push({ line: r.line, code: r.code, error: error.message });
+      else res.saved++;
+    }
+    await sb.from("audit_logs").insert({ user_id: me.userId, user_name: me.displayName, action: "IMPORT", table_name: "org_units", note: `โครงสร้างองค์กร: บันทึก ${res.saved} ไม่สำเร็จ ${res.failed.length}` });
+    revalidatePath("/settings/migration");
+    revalidatePath("/org");
+    return res;
   });
 }
 

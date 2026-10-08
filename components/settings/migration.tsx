@@ -6,8 +6,8 @@ import { ArrowUpRight, Check, Circle, Upload } from "lucide-react";
 import { useCan } from "@/components/app/me-context";
 import { Badge, Button, PageHeader, Panel, Spinner, clsx, runAction, toast } from "@/components/ui";
 import { money, num, thDateTime } from "@/lib/format";
-import { leaveTemplate, parseLeave, parseYtd, ytdTemplate } from "@/lib/migration/import";
-import { importLeaveAction, importYtdAction, migrationRefsAction, migrationStatusAction, setMigrationStepAction, type MigrationStatus } from "@/lib/migration/actions";
+import { leaveTemplate, orgTemplate, parseLeave, parseOrg, parseYtd, ytdTemplate } from "@/lib/migration/import";
+import { importLeaveAction, importOrgAction, importYtdAction, migrationRefsAction, migrationStatusAction, setMigrationStepAction, type MigrationStatus } from "@/lib/migration/actions";
 import { CsvImportModal } from "./csv-import-modal";
 
 type Who = "customer" | "vendor" | "both";
@@ -25,7 +25,7 @@ interface Step {
   auto?: boolean; // done automatically from the data
   detail?: ReactNode;
   links?: { href: string; label: string }[];
-  importKind?: "ytd" | "leave";
+  importKind?: "ytd" | "leave" | "org";
 }
 
 function buildSteps(s: MigrationStatus): Step[] {
@@ -38,8 +38,8 @@ function buildSteps(s: MigrationStatus): Step[] {
       links: [{ href: "/settings/company", label: "ข้อมูลบริษัท" }, { href: "/org/branches", label: "สาขา" }],
     },
     {
-      key: "org", title: "โครงสร้างองค์กรและตำแหน่งงาน", who: "customer",
-      prepare: "ผังหน่วยงาน (ฝ่าย / แผนก / ไลน์) และรายชื่อตำแหน่งพร้อมระดับ ใช้ชื่อตามที่ใช้ในระบบเดิมได้เลย",
+      key: "org", title: "สาขา โครงสร้างองค์กร และตำแหน่งงาน", who: "customer", importKind: "org",
+      prepare: "รายชื่อสาขา ผังหน่วยงาน (ฝ่าย / แผนก / ไลน์) และรายชื่อตำแหน่งพร้อมระดับ ใช้รหัสและชื่อตามระบบเดิมได้เลย ต้องมีก่อนนำเข้าพนักงาน เพราะไฟล์พนักงานอ้างถึงรหัสเหล่านี้",
       auto: s.orgUnits > 0 && s.positions > 0,
       detail: `สาขา ${num(s.branches)} · หน่วยงาน ${num(s.orgUnits)} · ตำแหน่ง ${num(s.positions)}`,
       links: [{ href: "/org", label: "โครงสร้างองค์กร" }, { href: "/org/positions", label: "ตำแหน่งงาน" }],
@@ -93,7 +93,7 @@ export function MigrationChecklist() {
   const can = useCan();
   const [s, setS] = useState<MigrationStatus | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
-  const [modal, setModal] = useState<"ytd" | "leave" | null>(null);
+  const [modal, setModal] = useState<"ytd" | "leave" | "org" | null>(null);
   const ro = !can("settings", "edit");
 
   const load = useCallback(async () => {
@@ -117,7 +117,8 @@ export function MigrationChecklist() {
   const refs = async () => {
     const r = await migrationRefsAction();
     if (!r.ok) throw new Error(r.error);
-    return { employees: new Set(r.data!.employees.map((x) => x.toLowerCase())), types: new Set(r.data!.leaveTypes.map((x) => x.toLowerCase())) };
+    const low = (a: string[]) => new Set(a.map((x) => x.toLowerCase()));
+    return { employees: low(r.data!.employees), types: low(r.data!.leaveTypes), branches: low(r.data!.branches), orgs: low(r.data!.orgs) };
   };
 
   return (
@@ -163,6 +164,7 @@ export function MigrationChecklist() {
                     {st.detail && <p className="num mt-1 text-[13.5px] text-ink-mute">{st.detail}</p>}
                     {mark && <p className="mt-1 text-[13px] text-jade-700">ทำเสร็จเมื่อ {thDateTime(mark.done_at)}{mark.by ? ` โดย ${mark.by}` : ""}</p>}
                     <div className="mt-3 flex flex-wrap items-center gap-2">
+                      {st.importKind === "org" && can("org", "create") && <Button size="sm" icon={<Upload className="size-4" />} onClick={() => setModal("org")}>นำเข้าโครงสร้างองค์กร</Button>}
                       {st.importKind === "ytd" && can("employee_private", "edit") && <Button size="sm" icon={<Upload className="size-4" />} onClick={() => setModal("ytd")}>นำเข้ายอดสะสม</Button>}
                       {st.importKind === "leave" && can("attendance", "edit") && <Button size="sm" icon={<Upload className="size-4" />} onClick={() => setModal("leave")}>นำเข้าวันลา</Button>}
                       {st.links?.map((l) => (
@@ -186,6 +188,23 @@ export function MigrationChecklist() {
         })}
       </ol>
 
+      <CsvImportModal
+        open={modal === "org"}
+        onClose={() => setModal(null)}
+        title="นำเข้าสาขา หน่วยงาน และตำแหน่ง"
+        intro={<>ไฟล์เดียวใส่ได้ทั้ง 3 อย่าง คอลัมน์ <b>ประเภทข้อมูล</b> ใส่ สาขา หน่วยงาน หรือ ตำแหน่ง หน่วยงานระบุ <b>รหัสหน่วยงานแม่</b> และ <b>รหัสสาขา</b> ได้ ตำแหน่งระบุ <b>รหัสหน่วยงาน</b> ระดับ และกระบอกเงินเดือนได้ ถ้ารหัสมีอยู่แล้ว ระบบจะอัปเดตชื่อและข้อมูลของรหัสนั้น</>}
+        templateName="แม่แบบโครงสร้างองค์กร.csv"
+        template={orgTemplate()}
+        headers={["ประเภท", "รหัส", "ชื่อ", "อยู่ใต้ / สังกัด"]}
+        preview={async (t) => {
+          const r = await refs();
+          const p = parseOrg(t, { branches: r.branches, orgs: r.orgs });
+          const KIND = { branch: "สาขา", org: "หน่วยงาน", position: "ตำแหน่ง" } as const;
+          return { missing: p.missing, rows: p.rows.map((x) => ({ line: x.line, code: x.code, errors: x.errors, cells: [KIND[x.kind], x.code, x.name, x.kind === "org" ? [x.parent, x.branch].filter(Boolean).join(" · ") : x.kind === "position" ? x.unit : x.head_office ? "สำนักงานใหญ่" : ""] })) };
+        }}
+        submit={importOrgAction}
+        onDone={load}
+      />
       <CsvImportModal
         open={modal === "ytd"}
         onClose={() => setModal(null)}

@@ -84,3 +84,21 @@ test("monthly flow: December adds ภ.ง.ด.1ก due end of February", () => {
   assert.equal(a.due, "2028-02-29");
   assert.equal(s.at(-1)!.key, "close");
 });
+
+test("parseOrg checks references across the file and orders parents first", async () => {
+  const { parseOrg, orgSaveOrder } = await import("../lib/migration/import");
+  const t = [
+    ["ประเภทข้อมูล", "รหัส", "ชื่อ", "รหัสหน่วยงานแม่", "รหัสสาขา", "รหัสหน่วยงาน", "ระดับตำแหน่ง"],
+    ["ตำแหน่ง", "OP", "พนักงาน", "", "", "L1", "2"],
+    ["หน่วยงาน", "L1", "ไลน์ 1", "PRD", "HQ", "", ""],
+    ["หน่วยงาน", "PRD", "ฝ่ายผลิต", "", "HQ", "", ""],
+    ["สาขา", "HQ", "สำนักงานใหญ่", "", "", "", ""],
+    ["หน่วยงาน", "X", "ผิด", "NOPE", "ZZ", "", ""],
+    ["อื่นๆ", "Y", "ผิด", "", "", "", ""],
+  ];
+  const r = parseOrg(t);
+  assert.deepEqual(r.rows.slice(0, 4).map((x) => x.errors), [[], [], [], []]);
+  assert.match(r.rows[4].errors.join(), /ไม่พบหน่วยงานแม่.*ไม่พบสาขา/);
+  assert.match(r.rows[5].errors.join(), /ประเภทข้อมูล/);
+  assert.deepEqual(orgSaveOrder(r.rows.slice(0, 4)).map((x) => x.code), ["HQ", "PRD", "L1", "OP"]);
+});
