@@ -170,6 +170,7 @@ export function PeriodWorkspace({ id }: { id: number }) {
         {period.payslip_published && <Badge color="green">เผยแพร่สลิปแล้ว</Badge>}
         {period.calculated_at && <span>คำนวณล่าสุด {thDateTime(period.calculated_at)}</span>}
         {period.approved_at && <span>· อนุมัติ {thDateTime(period.approved_at)}</span>}
+        <Link href="/payroll/monthly" className="ml-auto text-jade-700 hover:underline">ดูลำดับงานทั้งเดือน (ธนาคาร / สปส. / ภ.ง.ด.1)</Link>
         {dirty && editable && (
           <span className="inline-flex items-center gap-1 text-amber-ink">
             <AlertTriangle className="size-4" /> มีการแก้ไขรายการ กรุณาคำนวณใหม่ก่อนอนุมัติ

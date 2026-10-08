@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { FileCog, FileDown } from "lucide-react";
 import { Button, Select, Spinner, toast } from "@/components/ui";
 import { FilterField, MonthSelect, ReportShell, YearSelect } from "@/components/reports/report-shell";
@@ -22,8 +23,10 @@ const PER_SHEET = 10;
  */
 export default function SsoReportPage() {
   const now = new Date();
-  const [year, setYear] = useState(now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear());
-  const [month, setMonth] = useState(now.getMonth() === 0 ? 12 : now.getMonth());
+  const sp = useSearchParams();
+  const qy = Number(sp.get("year")), qm = Number(sp.get("month"));
+  const [year, setYear] = useState(qy >= 2000 && qy <= 2100 ? qy : now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear());
+  const [month, setMonth] = useState(qm >= 1 && qm <= 12 ? qm : now.getMonth() === 0 ? 12 : now.getMonth());
   const [branch, setBranch] = useState("");
   const [payDate, setPayDate] = useState(isoDate());
   const [cfg, setCfg] = useState<SsoConfig>(DEFAULT_SSO_CONFIG);

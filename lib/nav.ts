@@ -86,6 +86,7 @@ export const NAV: NavGroup[] = [
     label: "เงินเดือน",
     icon: "Wallet",
     items: [
+      { href: "/payroll/monthly", label: "งานเงินเดือนประจำเดือน", perm: ["payroll"] },
       { href: "/payroll", label: "งวดเงินเดือน", perm: ["payroll"] },
       { href: "/payroll/recurring", label: "รายรับรายจ่ายประจำ", perm: ["payroll"] },
       { href: "/payroll/salary", label: "ปรับเงินเดือน", perm: ["employee_private", "edit"] },
@@ -154,6 +155,7 @@ export const NAV: NavGroup[] = [
     label: "ตั้งค่า",
     icon: "Settings",
     items: [
+      { href: "/settings/migration", label: "ย้ายข้อมูลเข้าระบบ", perm: ["settings"] },
       { href: "/settings/company", label: "ข้อมูลบริษัท", perm: ["settings"] },
       { href: "/settings/users", label: "ผู้ใช้งาน", perm: ["security"] },
       { href: "/settings/roles", label: "กลุ่มผู้ใช้และสิทธิ์", perm: ["security"] },
@@ -163,5 +165,11 @@ export const NAV: NavGroup[] = [
       { href: "/settings/audit", label: "Back Log", perm: ["audit"] },
       { href: "/settings/license", label: "License / ระบบ", perm: ["settings"] },
     ],
+  },
+  {
+    key: "help",
+    label: "ช่วยเหลือ",
+    icon: "LifeBuoy",
+    items: [{ href: "/help", label: "ติดต่อและการดูแลระบบ", everyone: true }],
   },
 ];

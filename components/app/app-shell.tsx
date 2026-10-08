@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   Bell, Clock, FileBarChart, FileCheck2, GraduationCap, LayoutDashboard, LogOut, Megaphone, Menu, Network, Search, Settings,
-  Smartphone, Target, UserPlus, Users, Wallet, X, ChevronDown,
+  Smartphone, Target, UserPlus, Users, Wallet, X, ChevronDown, LifeBuoy,
 } from "lucide-react";
 import { clsx } from "clsx";
 import { NAV, type NavItem } from "@/lib/nav";
@@ -15,7 +15,7 @@ import { supabaseBrowser } from "@/lib/supabase/client";
 import { runAction } from "@/components/ui";
 import { thDateTime } from "@/lib/format";
 
-const ICONS: Record<string, typeof Bell> = { LayoutDashboard, Network, Users, Clock, FileCheck2, Wallet, FileBarChart, UserPlus, GraduationCap, Target, Megaphone, Settings };
+const ICONS: Record<string, typeof Bell> = { LayoutDashboard, Network, Users, Clock, FileCheck2, Wallet, FileBarChart, UserPlus, GraduationCap, Target, Megaphone, Settings, LifeBuoy };
 
 function visible(me: Me, item: NavItem) {
   if (item.everyone) return true;

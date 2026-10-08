@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
 import { Search } from "lucide-react";
 import { Input, Select, Spinner, toast } from "@/components/ui";
 import { FilterField, ReportShell, YearSelect } from "@/components/reports/report-shell";
@@ -15,7 +16,8 @@ const COPIES = {
 
 /** หนังสือรับรองการหักภาษี ณ ที่จ่าย ตามมาตรา 50 ทวิ — official layout, copies 1 and 2 per employee, bulk print */
 export default function Tawi50Page() {
-  const [year, setYear] = useState(new Date().getMonth() < 3 ? new Date().getFullYear() - 1 : new Date().getFullYear());
+  const qy = Number(useSearchParams().get("year"));
+  const [year, setYear] = useState(qy >= 2000 && qy <= 2100 ? qy : new Date().getMonth() < 3 ? new Date().getFullYear() - 1 : new Date().getFullYear());
   const [rows, setRows] = useState<TaxRow[] | null>(null);
   const [q, setQ] = useState("");
   const [bookNo, setBookNo] = useState("1");
