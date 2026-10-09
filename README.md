@@ -2,8 +2,8 @@
 
 โดย บริษัท โกอะลอง จำกัด (GO Along Co., Ltd.)
 
-ระบบ HR ครบวงจรสำหรับบริษัทไทย ฟังก์ชันเทียบเท่าหรือมากกว่า HumanSoft แพ็กเกจ PROFESSIONAL
-(ดูตารางเปรียบเทียบ [docs/FEATURES.md](docs/FEATURES.md)) แต่ขายครั้งเดียวและติดตั้งบนเซิร์ฟเวอร์ของลูกค้า
+ระบบ HR ครบวงจรสำหรับบริษัทไทย ฟังก์ชันเทียบเท่าหรือมากกว่าระบบ HR แบบ SaaS ชั้นนำในตลาด
+(ดูตารางฟีเจอร์ [docs/FEATURES.md](docs/FEATURES.md)) แต่ขายครั้งเดียวและติดตั้งบนเซิร์ฟเวอร์ของลูกค้า
 
 - **หลังบ้าน HR (Desktop)** — โครงสร้างองค์กร 10 ชั้น, ข้อมูลพนักงานครบทุกหมวด, ลงเวลา/กะ/ผังกำลังพล, เอกสาร 14 ประเภท อนุมัติได้ 10 ขั้น,
   เงินเดือน (ภาษี/ประกันสังคม/PVD/เงินกู้/คอมมิชชั่น), ภ.ง.ด.1 / 1ก / สปส.1-10 / 50 ทวิ, สรรหา, ทดลองงาน, E-Learning, ประเมินผล/KPI,
@@ -222,7 +222,7 @@ npm run dev
 
 ## เอกสาร
 - [docs/INSTALL.md](docs/INSTALL.md) — ติดตั้ง ตั้งค่าหลังติดตั้ง สำรองข้อมูล อัปเกรด License
-- [docs/FEATURES.md](docs/FEATURES.md) — เทียบฟีเจอร์กับ HumanSoft PROFESSIONAL
+- [docs/FEATURES.md](docs/FEATURES.md) — ตารางฟีเจอร์ทั้งหมด เทียบกับระบบ HR แบบ SaaS ทั่วไป
 - [docs/GOV-BANK-FILES.md](docs/GOV-BANK-FILES.md) — รูปแบบไฟล์ ภ.ง.ด.1 / สปส. / ธนาคาร
 - [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) — โครงสร้างโค้ด กติกาการพัฒนา สิทธิ์ และฐานข้อมูล
 - [samples/import/README.md](samples/import/README.md) — ไฟล์ตัวอย่างสำหรับนำเข้าข้อมูล

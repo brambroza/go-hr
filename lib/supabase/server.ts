@@ -1,7 +1,7 @@
 import "server-only";
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
-import { AUTH_COOKIE } from "./cookie";
+import { AUTH_COOKIE, hasSessionOnlyMarker, persistCookieOptions } from "./cookie";
 import { publicEnv, serverSupabaseUrl } from "../public-env";
 
 /** Supabase client for Server Components / Server Actions / Route Handlers (user session → RLS applies). */
@@ -18,7 +18,8 @@ export async function supabaseServer() {
         },
         setAll(toSet) {
           try {
-            toSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options));
+            const sessionOnly = hasSessionOnlyMarker(cookieStore.getAll());
+            toSet.forEach(({ name, value, options }) => cookieStore.set(name, value, persistCookieOptions(options, sessionOnly)));
           } catch {
             // called from a Server Component — the proxy refreshes the session instead
           }

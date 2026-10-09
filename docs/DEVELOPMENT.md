@@ -1,7 +1,7 @@
 # GO HR — Developer guide
 
 GO HR is an on-premise HR / time-attendance / payroll system for Thai companies (feature parity or better with
-HumanSoft PROFESSIONAL). Sold once and installed on the customer's server.
+the leading Thai SaaS HR packages). Sold once and installed on the customer's server.
 
 ## Stack
 

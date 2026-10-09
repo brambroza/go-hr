@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
-import { AUTH_COOKIE } from "@/lib/supabase/cookie";
+import { AUTH_COOKIE, hasSessionOnlyMarker, persistCookieOptions } from "@/lib/supabase/cookie";
 import { publicEnv, serverSupabaseUrl } from "@/lib/public-env";
 
 // Paths that work without a signed-in user
@@ -19,9 +19,11 @@ export async function proxy(request: NextRequest) {
           return request.cookies.getAll();
         },
         setAll(toSet) {
+          // "remember me" off → the refreshed auth cookie must stay a session cookie
+          const sessionOnly = hasSessionOnlyMarker(request.cookies.getAll());
           toSet.forEach(({ name, value }) => request.cookies.set(name, value));
           response = NextResponse.next({ request });
-          toSet.forEach(({ name, value, options }) => response.cookies.set(name, value, options));
+          toSet.forEach(({ name, value, options }) => response.cookies.set(name, value, persistCookieOptions(options, sessionOnly)));
         },
       },
     },

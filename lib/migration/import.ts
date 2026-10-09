@@ -1,4 +1,4 @@
-// Go-live data import (moving from HumanSoft / Excel): opening year-to-date payroll totals and leave balances.
+// Go-live data import (moving from a previous HR system / Excel): opening year-to-date payroll totals and leave balances.
 // Pure functions shared by the browser preview and the server action (the server re-validates).
 
 export type CsvTable = string[][];

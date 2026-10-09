@@ -2,7 +2,7 @@
 -- GO HR — go-live & handover support                                    (idempotent)
 --
 --   1) leave_quotas.opening_used_days — leave already taken in the old system this year
---      (imported when moving from HumanSoft mid-year); counted as "used" in v_leave_balances.
+--      (imported when moving from a previous HR system mid-year); counted as "used" in v_leave_balances.
 --   2) payroll_filings — what was sent to the bank / SSO / Revenue Department for each pay month
 --      (date, reference no., amount) so the monthly payroll checklist knows what is still open.
 -- =====================================================================

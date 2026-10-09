@@ -1,23 +1,50 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff } from "lucide-react";
-import { Button, Field, Input } from "@/components/ui";
+import { Button, Checkbox, Field, Input } from "@/components/ui";
 import { supabaseBrowser } from "@/lib/supabase/client";
+import { REMEMBER_LOGIN_KEY, SESSION_ONLY_COOKIE } from "@/lib/supabase/cookie";
+
+const secure = () => (typeof location !== "undefined" && location.protocol === "https:" ? "; Secure" : "");
+
+/** Mark this browser session as "do not remember": a session cookie that every auth-cookie writer checks */
+function setSessionOnly(on: boolean) {
+  document.cookie = on ? `${SESSION_ONLY_COOKIE}=1; Path=/; SameSite=Lax${secure()}` : `${SESSION_ONLY_COOKIE}=; Path=/; Max-Age=0; SameSite=Lax${secure()}`;
+}
 
 export function LoginForm({ next }: { next: string }) {
   const router = useRouter();
   const [login, setLogin] = useState("");
   const [password, setPassword] = useState("");
   const [show, setShow] = useState(false);
+  const [remember, setRemember] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  // prefill the username remembered on this device
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(REMEMBER_LOGIN_KEY);
+      if (saved) setLogin(saved);
+    } catch {
+      /* storage blocked (private mode) */
+    }
+  }, []);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     setLoading(true);
+    // must be set before signInWithPassword writes the auth cookie
+    setSessionOnly(!remember);
+    try {
+      if (remember) localStorage.setItem(REMEMBER_LOGIN_KEY, login.trim());
+      else localStorage.removeItem(REMEMBER_LOGIN_KEY);
+    } catch {
+      /* ignore */
+    }
     const sb = supabaseBrowser();
     let email = login.trim();
     if (!email.includes("@")) {
@@ -48,11 +75,13 @@ export function LoginForm({ next }: { next: string }) {
           </button>
         </div>
       </Field>
+      <Checkbox label="จดจำฉันไว้ในเครื่องนี้" checked={remember} onChange={setRemember} />
       {error && <p className="rounded-md bg-rust-soft px-3 py-2 text-sm text-rust">{error}</p>}
       <Button type="submit" size="lg" loading={loading}>
         เข้าสู่ระบบ
       </Button>
       <p className="text-sm text-ink-mute">ลืมรหัสผ่าน? ติดต่อฝ่ายบุคคลเพื่อรีเซ็ตรหัสผ่าน</p>
+      <p className="text-xs text-ink-mute">ติ๊ก “จดจำฉันไว้” ระบบจะจำชื่อผู้ใช้และคงการเข้าสู่ระบบไว้แม้ปิดเบราว์เซอร์ · ไม่ติ๊ก = ออกจากระบบอัตโนมัติเมื่อปิดเบราว์เซอร์ (เหมาะกับเครื่องส่วนกลาง)</p>
     </form>
   );
 }
