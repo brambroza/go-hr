@@ -2,7 +2,8 @@
 
 /* GO HR design tokens — light, minimal, modern
    jade  — the one brand accent (fresh emerald, base #10b981). 600 is the primary button
-           (#04835d, 4.8:1 with white text); 50/100 are pale tints for selected/active states
+           (#04835d, 4.8:1 with white text); 50/100 are pale tints for selected/active states.
+           Disabled controls are grey (line + ink-mute), never a jade tint
    ink   — neutral slate text (never green-tinted)
    paper — app background (very light neutral grey); surfaces are white
    amber — "waiting for someone" states (pending approvals, missing scans)
@@ -109,6 +110,9 @@ body {
     opacity: 1;
     transform: none;
   }
+}
+.dp-in {
+  animation: toast-in 0.14s ease-out;
 }
 .toast-in {
   animation: toast-in 0.18s ease-out;

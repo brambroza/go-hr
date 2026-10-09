@@ -15,7 +15,9 @@
     "db:seed-demo-finish": "tsx --tsconfig scripts/tsconfig.json scripts/seed-demo-finish.ts",
     "admin:create": "tsx scripts/create-admin.ts",
     "license:install": "tsx scripts/license.ts install",
-    "postinstall": "node scripts/copy-face-models.mjs"
+    "postinstall": "node scripts/copy-face-models.mjs",
+    "db:import-csv": "tsx --tsconfig scripts/tsconfig.json scripts/import-csv.ts",
+    "users:create-employees": "tsx scripts/create-employee-logins.ts"
   },
   "dependencies": {
     "@fontsource/ibm-plex-sans-thai": "^5.3.0",

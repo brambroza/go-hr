@@ -23,7 +23,7 @@ app/(admin)/...           back-office console (AppShell sidebar). Layout require
 app/m/...                 employee self-service PWA (mobile first, bottom nav)
 app/careers, app/kiosk    public pages (no login)
 app/api/...               route handlers (cron, devices, LINE webhook, public apply, exports)
-components/ui             UI kit (Button, Input, Select, Field, Panel, PageHeader, Badge, Modal, Tabs, toast, useConfirm, Stat, Empty)
+components/ui             UI kit (Button, Input, Select, Field, Panel, PageHeader, Badge, Modal, Tabs, toast, useConfirm, Stat, Empty, DatePicker — `<Input type="date|month|datetime-local">` renders it)
 components/crud           CrudPage (config-driven list + form), FormFields, EmployeePicker
 components/charts.tsx     BarList, Donut, ColumnChart (pure SVG)
 lib/permissions.ts        MENUS, can(), Me type      lib/nav.ts  sidebar items (each must have a page)
@@ -72,6 +72,8 @@ Supervisors (anyone with subordinates) see their team even without HR permission
 - Colors (Tailwind tokens in `app/globals.css`): ONE accent `jade-50…950` = emerald scale based on #10b981 (`jade-500`);
   primary buttons `jade-600` #04835d (white text, 4.8:1), selected/active = `bg-jade-50 text-jade-700` pale pill.
   Text is neutral slate: `ink` #111827, `ink-soft` #4b5563, `ink-mute` #6b7280 (never green-tinted grey).
+  Disabled / loading controls are grey: `bg-line` + `text-ink-mute` (built into `Button`; hand-styled buttons must do the
+  same) — never a jade tint or opacity on jade.
   Status pills (`Badge`): amber = pending (`amber-50` + `amber-ink`), red = problems (`rust-soft` #fef2f2 + `rust` #c53030),
   blue = info (`sky-50` + `sky-800`). Charts use the light palette in `components/charts.tsx`. Use `num` class for numbers.
 - Feedback on every mutating action (save / delete / edit / approve / submit / upload …):

@@ -5,6 +5,7 @@ import { CrudPage } from "@/components/crud/crud-page";
 import { PageHeader, Tabs, Badge } from "@/components/ui";
 import { OrgChart } from "@/components/org/org-chart";
 import { UNIT_TYPES, listOptions } from "@/lib/employees/labels";
+import { ORG_CHECKIN_MODE, validateOrgPolicy, type OrgCheckinMode } from "@/lib/attendance/checkin-policy";
 
 type Tab = "chart" | "list";
 
@@ -38,6 +39,11 @@ export default function OrgPage() {
             exportName: "org_units",
             formSize: "lg",
             afterSave: () => setVersion((v) => v + 1),
+            beforeSave: (v) => ({
+              ...v,
+              // only "locations" mode keeps a list; an empty list is stored as null
+              work_location_ids: v.checkin_mode === "locations" && Array.isArray(v.work_location_ids) && v.work_location_ids.length ? v.work_location_ids : null,
+            }),
             filters: [
               { name: "parent_id", label: "หน่วยงานแม่", refField: "parent_id" },
               { name: "branch_id", label: "สาขา", refField: "branch_id" },
@@ -62,6 +68,16 @@ export default function OrgPage() {
               { key: "manager_employee_id", label: "หัวหน้าหน่วยงาน" },
               { key: "branch_id", label: "สาขา" },
               { key: "cost_center", label: "Cost center" },
+              {
+                key: "checkin_mode",
+                label: "พื้นที่ลงเวลา",
+                render: (r, { refLabel }) => {
+                  const mode = String(r.checkin_mode ?? "inherit") as OrgCheckinMode;
+                  if (mode === "anywhere") return <Badge color="blue">ไม่จำกัดพื้นที่</Badge>;
+                  if (mode === "locations") return <span className="text-sm">{refLabel("work_location_ids", r.work_location_ids) || "—"}</span>;
+                  return <span className="text-sm text-ink-mute">ตามหน่วยงานแม่</span>;
+                },
+              },
               { key: "is_active", label: "สถานะ", render: (r) => (r.is_active ? <Badge color="green">ใช้งาน</Badge> : <Badge>ปิดใช้งาน</Badge>) },
             ],
             fields: [
@@ -82,6 +98,26 @@ export default function OrgPage() {
               { name: "cost_center", label: "Cost center", type: "text", hint: "ใช้แยกต้นทุนค่าแรงในรายงานบัญชี" },
               { name: "sort_order", label: "ลำดับการแสดง", type: "number", default: 0, min: 0 },
               { name: "is_active", label: "ใช้งาน", type: "boolean", default: true },
+              {
+                name: "checkin_mode",
+                label: "พื้นที่ลงเวลาของหน่วยงาน",
+                type: "select",
+                default: "inherit",
+                section: "การลงเวลา",
+                options: (Object.keys(ORG_CHECKIN_MODE) as OrgCheckinMode[]).map((value) => ({ value, label: ORG_CHECKIN_MODE[value] })),
+                hint: "ใช้กับพนักงานทุกคนในหน่วยงานนี้และหน่วยงานลูกที่ตั้งเป็น “ตามหน่วยงานแม่” · ถ้าพนักงานกำหนดพื้นที่รายคนไว้ จะใช้ของพนักงานก่อน · “ไม่จำกัดพื้นที่” เหมาะกับฝ่ายขาย/งานนอกสถานที่ (บันทึกพิกัด GPS แต่ไม่ตรวจรัศมี)",
+                validate: (v, values) => validateOrgPolicy(v, values.work_location_ids),
+              },
+              {
+                name: "work_location_ids",
+                label: "จุดลงเวลาที่อนุญาต",
+                type: "refs",
+                span: 3,
+                section: "การลงเวลา",
+                hidden: (values) => values.checkin_mode !== "locations",
+                ref: { table: "work_locations", select: "id, name", order: "name", label: "name", filter: (q) => q.eq("is_active", true) },
+                validate: (v, values) => validateOrgPolicy(values.checkin_mode, v),
+              },
             ],
           }}
         />

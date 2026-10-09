@@ -242,7 +242,7 @@ export function FaceCamera({
           disabled={phase !== "scanning" || !good || paused}
           className={clsx(
             "mt-3 flex h-12 w-full items-center justify-center gap-2 rounded-[var(--radius-ctl)] text-[15px] font-semibold text-white",
-            phase === "scanning" && good && !paused ? "bg-jade-600 active:bg-jade-800" : "bg-jade-100 !text-jade-800",
+            phase === "scanning" && good && !paused ? "bg-jade-600 active:bg-jade-800" : "bg-line !text-ink-mute",
           )}
         >
           <ScanFace className="size-5" /> {phase === "processing" ? "กำลังประมวลผล…" : captureLabel}

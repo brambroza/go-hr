@@ -10,6 +10,7 @@ import { resizeImage, uploadFile } from "@/lib/storage";
 import { thDate, thTime, isoDate } from "@/lib/format";
 import { useToday } from "./today";
 import { DAY_TYPE_LABEL, DIRECTIONS, DIRECTION_LABEL, distanceM, errText, fmtDistance, isNetworkError, SOURCE_LABEL } from "./lib";
+import { allowedLocations, DEFAULT_POLICY, gpsAllowed, parsePolicy, type CheckinPolicy } from "@/lib/attendance/checkin-policy";
 import { enqueueCheckin, onQueueChange, queuedCheckins, removeQueued, syncQueue, type QueuedCheckin } from "./offline-queue";
 import { QrScanner } from "./qr-scanner";
 import type { FaceCapture } from "./face-scan";
@@ -84,7 +85,8 @@ export function CheckinScreen() {
   const [net, setNet] = useState<NetInfo | null>(null);
   const [direction, setDirection] = useState("auto");
   const [locs, setLocs] = useState<Loc[]>([]);
-  const [allowedIds, setAllowedIds] = useState<number[] | null>(null);
+  // effective area policy for this employee (own list → org unit → every location); resolved by the database
+  const [policy, setPolicy] = useState<CheckinPolicy>(DEFAULT_POLICY);
   const [photo, setPhoto] = useState<{ blob: Blob; preview: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const [syncing, setSyncing] = useState(false);
@@ -112,11 +114,7 @@ export function CheckinScreen() {
       .select("id, name, latitude, longitude, radius_m, allow_gps, allow_qr, require_photo, is_active")
       .eq("is_active", true)
       .then(({ data }: { data: unknown }) => setLocs((data as Loc[]) ?? []));
-    sb.from("employees")
-      .select("work_location_ids")
-      .eq("id", me.employeeId!)
-      .maybeSingle()
-      .then(({ data }: { data: unknown }) => setAllowedIds(((data as { work_location_ids: number[] | null } | null)?.work_location_ids ?? null) || null));
+    sb.rpc("my_checkin_policy").then(({ data }: { data: unknown }) => setPolicy(parsePolicy(data)));
     const refresh = () => setQueue(queuedCheckins(me.employeeId));
     refresh();
     setOnline(navigator.onLine);
@@ -135,21 +133,23 @@ export function CheckinScreen() {
     };
   }, [me.employeeId, reload]);
 
-  // nearest allowed GPS location
+  // nearest allowed GPS location (with "anywhere" it is shown for information only)
+  const anywhere = policy.mode === "anywhere";
   const nearest = useMemo(() => {
     if (!geo.fix) return null;
     let best: { loc: Loc; dist: number } | null = null;
-    for (const l of locs) {
+    for (const l of allowedLocations(policy, locs)) {
       if (!l.allow_gps || l.latitude == null || l.longitude == null) continue;
-      if (allowedIds?.length && !allowedIds.includes(l.id)) continue;
       const d = distanceM(geo.fix.lat, geo.fix.lng, l.latitude, l.longitude);
       if (!best || d < best.dist) best = { loc: l, dist: d };
     }
     return best;
-  }, [geo.fix, locs, allowedIds]);
-  const inside = nearest ? nearest.dist <= nearest.loc.radius_m + Math.min(geo.fix?.acc ?? 0, 100) : false;
+  }, [geo.fix, locs, policy]);
+  const insideRadius = nearest ? nearest.dist <= nearest.loc.radius_m + Math.min(geo.fix?.acc ?? 0, 100) : false;
+  const inside = gpsAllowed(policy, insideRadius);
   const netLoc = method === "wifi" && net?.locations[0] ? locs.find((l) => l.id === net.locations[0].id) : undefined;
-  const photoRequired = method === "gps" ? !!nearest?.loc.require_photo : method === "wifi" ? !!netLoc?.require_photo : false;
+  // no location is attached to an "anywhere" GPS check-in, so no per-location photo rule applies
+  const photoRequired = method === "gps" ? !anywhere && !!nearest?.loc.require_photo : method === "wifi" ? !!netLoc?.require_photo : false;
 
   const checkNetwork = useCallback(async () => {
     setNet((n) => ({ ip: n?.ip ?? null, locations: n?.locations ?? [], message: null, loading: true }));
@@ -188,7 +188,7 @@ export function CheckinScreen() {
       return;
     }
     const q = enqueueCheckin({ latitude: geo.fix.lat, longitude: geo.fix.lng, accuracy: geo.fix.acc, direction, employee_id: me.employeeId });
-    setResult({ ok: true, time: q.log_time, location: nearest?.loc.name ?? null, distance: nearest ? Math.round(nearest.dist) : null, offline: true });
+    setResult({ ok: true, time: q.log_time, location: anywhere ? null : nearest?.loc.name ?? null, distance: !anywhere && nearest ? Math.round(nearest.dist) : null, offline: true });
   }
 
   async function submit(opts: { qrToken?: string } = {}) {
@@ -403,6 +403,18 @@ export function CheckinScreen() {
               <div className="flex items-center gap-3 text-[15px] text-ink-soft">
                 <Crosshair className="size-5 text-jade-600 motion-safe:animate-pulse" /> กำลังหาตำแหน่งของคุณ…
               </div>
+            ) : anywhere ? (
+              <div className="flex items-center gap-3">
+                <span className="grid size-10 shrink-0 place-items-center rounded-full bg-jade-50 text-jade-700">
+                  <MapPin className="size-5" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="font-semibold text-jade-800">ลงเวลาได้ทุกที่</div>
+                  <div className="truncate text-sm text-ink-soft">
+                    หน่วยงานของคุณไม่จำกัดพื้นที่ · ระบบบันทึกตำแหน่งปัจจุบัน{nearest ? ` (ใกล้ ${nearest.loc.name} ${fmtDistance(nearest.dist)})` : ""}
+                  </div>
+                </div>
+              </div>
             ) : !nearest ? (
               <div className="flex items-start gap-3 text-[15px] text-ink">
                 <TriangleAlert className="mt-0.5 size-5 shrink-0 text-amber-ink" /> ยังไม่ได้ตั้งค่าพื้นที่ลงเวลาด้วย GPS — ติดต่อฝ่ายบุคคล
@@ -546,7 +558,7 @@ export function CheckinScreen() {
             disabled={busy || !net || net.loading || !net.locations.length || !online}
             className={clsx(
               "mt-4 flex h-[68px] w-full items-center justify-center gap-2.5 rounded-[var(--radius-panel)] text-[19px] font-semibold text-white shadow-sm transition-colors",
-              busy || !net?.locations.length || !online ? "bg-jade-100 !text-jade-800 shadow-none" : "bg-jade-600 active:bg-jade-800",
+              busy || !net?.locations.length || !online ? "bg-line !text-ink-mute shadow-none" : "bg-jade-600 active:bg-jade-800",
             )}
           >
             {busy ? <Spinner className="size-6 !text-current" /> : <Wifi className="size-6" />}
@@ -561,7 +573,7 @@ export function CheckinScreen() {
             disabled={busy || (!geo.fix && !geo.error)}
             className={clsx(
               "mt-4 flex h-[68px] w-full items-center justify-center gap-2.5 rounded-[var(--radius-panel)] text-[19px] font-semibold text-white shadow-sm transition-colors",
-              busy || (!geo.fix && !geo.error) ? "bg-jade-100 !text-jade-800 shadow-none" : "bg-jade-600 active:bg-jade-800",
+              busy || (!geo.fix && !geo.error) ? "bg-line !text-ink-mute shadow-none" : "bg-jade-600 active:bg-jade-800",
             )}
           >
             {busy ? <Spinner className="size-6 !text-current" /> : online ? <Fingerprint /> : <CloudOff className="size-6" />}

@@ -18,6 +18,8 @@ const nextConfig: NextConfig = {
       // links stored in notifications by the database (act_request) → employee app
       { source: "/me/requests", has: [{ type: "query", key: "id", value: "(?<id>\\d+)" }], destination: "/m/requests/:id", permanent: false },
       { source: "/me/requests", destination: "/m/requests", permanent: false },
+      // the employee app has no login page of its own — people guess /m/login
+      { source: "/m/login", destination: "/login?next=/m", permanent: false },
     ];
   },
   experimental: {

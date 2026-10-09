@@ -169,7 +169,7 @@ function Header({ emp, names, reload }: { emp: Employee; names: { org?: string; 
                 onClick={() => input.current?.click()}
                 disabled={busy}
                 aria-label="เปลี่ยนรูปพนักงาน"
-                className="absolute -bottom-1 -right-1 grid size-8 place-items-center rounded-full border-2 border-white bg-jade-600 text-white hover:bg-jade-700 disabled:opacity-60"
+                className="absolute -bottom-1 -right-1 grid size-8 place-items-center rounded-full border-2 border-white bg-jade-600 text-white hover:bg-jade-700 disabled:bg-line disabled:text-ink-mute disabled:hover:bg-line"
               >
                 {busy ? <Spinner className="size-4 text-white" /> : <Camera className="size-4" />}
               </button>

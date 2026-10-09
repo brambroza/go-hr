@@ -3,7 +3,7 @@
 import { useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { CheckCircle2, FileUp, Loader2, ShieldCheck } from "lucide-react";
-import { clsx, toast } from "@/components/ui";
+import { clsx, DatePicker, toast } from "@/components/ui";
 import { EDU_LEVELS, type JobQuestion } from "@/components/recruit/labels";
 
 const inputCls =
@@ -135,7 +135,7 @@ export function ApplyForm({ slug, title, questions, consentText, companyName }: 
             <input name="email" type="email" inputMode="email" autoComplete="email" className={clsx(inputCls, "h-12")} />
           </F>
           <F label="วันเกิด" error={fieldErr("birth_date")}>
-            <input name="birth_date" type="date" className={clsx(inputCls, "h-12")} />
+            <DatePicker name="birth_date" className="h-12" max={new Date().toISOString().slice(0, 10)} />
           </F>
           <F label="เพศ">
             <select name="gender" className={clsx(inputCls, "h-12")} defaultValue="">
@@ -178,7 +178,7 @@ export function ApplyForm({ slug, title, questions, consentText, companyName }: 
             <input name="expected_salary" type="number" min={0} inputMode="numeric" className={clsx(inputCls, "num h-12")} />
           </F>
           <F label="วันที่เริ่มงานได้" error={fieldErr("available_date")}>
-            <input name="available_date" type="date" className={clsx(inputCls, "h-12")} />
+            <DatePicker name="available_date" className="h-12" />
           </F>
         </fieldset>
 
@@ -246,7 +246,7 @@ export function ApplyForm({ slug, title, questions, consentText, companyName }: 
           </p>
         )}
 
-        <button type="submit" disabled={busy} className="flex h-13 min-h-12 items-center justify-center gap-2 rounded-[var(--radius-ctl)] bg-jade-600 text-[17px] font-semibold text-white hover:bg-jade-700 disabled:opacity-60">
+        <button type="submit" disabled={busy} className="flex h-13 min-h-12 items-center justify-center gap-2 rounded-[var(--radius-ctl)] bg-jade-600 text-[17px] font-semibold text-white hover:bg-jade-700 disabled:bg-line disabled:text-ink-mute disabled:hover:bg-line">
           {busy && <Loader2 className="size-5 animate-spin" />}
           {busy ? "กำลังส่งใบสมัคร…" : "ส่งใบสมัคร"}
         </button>

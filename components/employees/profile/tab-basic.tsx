@@ -85,7 +85,7 @@ const EMPLOYMENT: FieldDef[] = [
   { name: "default_shift_id", label: "กะการทำงานเริ่มต้น", type: "ref", ref: { table: "shifts", select: "id, code, name", order: "code", label: "name" }, section: "เวลาทำงาน" },
   { name: "weekly_off_days", label: "วันหยุดประจำสัปดาห์", type: "weekdays", section: "เวลาทำงาน" },
   { name: "attendance_exempt", label: "ไม่ต้องลงเวลา (เช่น ผู้บริหาร)", type: "boolean", section: "เวลาทำงาน" },
-  { name: "work_location_ids", label: "พื้นที่ลงเวลาที่อนุญาต", type: "refs", ref: { table: "work_locations", select: "id, name", order: "name", label: "name" }, span: 3, section: "เวลาทำงาน", hint: "ไม่เลือก = ใช้พื้นที่ของสาขา" },
+  { name: "work_location_ids", label: "พื้นที่ลงเวลาที่อนุญาต", type: "refs", ref: { table: "work_locations", select: "id, name", order: "name", label: "name" }, span: 3, section: "เวลาทำงาน", hint: "ไม่เลือก = ใช้ตามหน่วยงาน (ตั้งค่าที่โครงสร้างองค์กร) ถ้าหน่วยงานไม่ได้ตั้ง = ทุกจุดที่เปิดใช้งาน" },
 ];
 
 export function EmploymentTab({ emp, reload }: TabProps) {

@@ -1,18 +1,23 @@
 "use client";
 
-import { forwardRef, useEffect, useId, useRef, useState, useSyncExternalStore, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from "react";
+import { forwardRef, useEffect, useId, useRef, useState, useSyncExternalStore, type ButtonHTMLAttributes, type ChangeEvent, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from "react";
 import { clsx } from "clsx";
 import { CheckCircle2, Info, Loader2, X, XCircle } from "lucide-react";
+import { inputCls } from "./input-cls";
+import { DatePicker, type PickerKind } from "./date-picker";
+
+export { DatePicker } from "./date-picker";
+export type { DatePickerProps, PickerKind } from "./date-picker";
 
 export { clsx };
 
 // ------------------------------------------------------------------ Button
 type Variant = "primary" | "secondary" | "ghost" | "danger" | "subtle";
 const VARIANTS: Record<Variant, string> = {
-  primary: "bg-jade-600 text-white shadow-[var(--shadow-soft)] hover:bg-jade-700 active:bg-jade-800 disabled:bg-jade-200 disabled:text-white disabled:shadow-none",
-  secondary: "bg-white text-ink border border-line shadow-[var(--shadow-soft)] hover:bg-paper hover:border-gray-300 disabled:text-ink-mute disabled:shadow-none",
+  primary: "bg-jade-600 text-white shadow-[var(--shadow-soft)] hover:bg-jade-700 active:bg-jade-800",
+  secondary: "bg-white text-ink border border-line shadow-[var(--shadow-soft)] hover:bg-paper hover:border-gray-300",
   ghost: "text-ink-soft hover:bg-paper hover:text-ink",
-  danger: "bg-rust text-white shadow-[var(--shadow-soft)] hover:bg-red-800 disabled:opacity-50",
+  danger: "bg-rust text-white shadow-[var(--shadow-soft)] hover:bg-red-800",
   subtle: "bg-jade-50 text-jade-700 hover:bg-jade-100",
 };
 
@@ -34,7 +39,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
       disabled={disabled || loading}
       aria-busy={loading || undefined}
       className={clsx(
-        "inline-flex items-center justify-center gap-1.5 rounded-[var(--radius-ctl)] font-medium transition-colors whitespace-nowrap disabled:cursor-not-allowed aria-busy:cursor-progress",
+        "inline-flex items-center justify-center gap-1.5 rounded-[var(--radius-ctl)] font-medium transition-colors whitespace-nowrap disabled:cursor-not-allowed disabled:bg-line disabled:text-ink-mute disabled:border-transparent disabled:shadow-none disabled:hover:bg-line aria-busy:cursor-progress",
         size === "sm" && "h-8 px-2.5 text-sm",
         size === "md" && "h-10 px-4 text-[15px]",
         size === "lg" && "h-12 px-5 text-base",
@@ -50,11 +55,39 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
 });
 
 // ------------------------------------------------------------------ Inputs
-const inputCls =
-  "w-full rounded-[var(--radius-ctl)] border border-line bg-white px-3 text-[15px] text-ink placeholder:text-ink-mute hover:border-gray-300 focus:border-jade-500 focus:outline-none focus:ring-4 focus:ring-jade-100 disabled:bg-paper disabled:text-ink-mute";
+const DATE_TYPES: Record<string, PickerKind> = { date: "date", month: "month", "datetime-local": "datetime" };
 
-export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(function Input({ className, ...rest }, ref) {
-  return <input ref={ref} className={clsx(inputCls, "h-10", className)} {...rest} />;
+/**
+ * Text input. `type="date" | "month" | "datetime-local"` renders the app's calendar picker instead of the
+ * native control; it still calls onChange with an event-like object whose target.value is the same string
+ * a native input would give, so existing `e.target.value` handlers keep working.
+ */
+export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(function Input({ className, type, ...rest }, ref) {
+  const kind = type ? DATE_TYPES[type] : undefined;
+  if (kind) {
+    const { value, defaultValue, onChange, min, max, disabled, readOnly, required, name, id, placeholder, autoFocus, "aria-label": ariaLabel } = rest;
+    return (
+      <DatePicker
+        ref={ref}
+        kind={kind}
+        value={value == null ? undefined : String(value)}
+        defaultValue={defaultValue == null ? undefined : String(defaultValue)}
+        onChange={(v) => onChange?.({ target: { value: v, name: name ?? "" }, currentTarget: { value: v, name: name ?? "" } } as unknown as ChangeEvent<HTMLInputElement>)}
+        min={min == null ? undefined : String(min)}
+        max={max == null ? undefined : String(max)}
+        disabled={disabled}
+        readOnly={readOnly}
+        required={required}
+        name={name}
+        id={id}
+        placeholder={placeholder}
+        autoFocus={autoFocus}
+        aria-label={ariaLabel}
+        className={className}
+      />
+    );
+  }
+  return <input ref={ref} type={type} className={clsx(inputCls, "h-10", className)} {...rest} />;
 });
 
 export const Textarea = forwardRef<HTMLTextAreaElement, TextareaHTMLAttributes<HTMLTextAreaElement>>(function Textarea({ className, ...rest }, ref) {

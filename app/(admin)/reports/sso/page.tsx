@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { FileCog, FileDown } from "lucide-react";
-import { Button, Select, Spinner, toast } from "@/components/ui";
+import { Button, Input, Select, Spinner, toast } from "@/components/ui";
 import { FilterField, MonthSelect, ReportShell, YearSelect } from "@/components/reports/report-shell";
 import { loadCompanyAndBranches, loadPaidEntries, loadPeople, type EmpLite, type PrivLite } from "@/components/reports/data";
 import { Box, DigitBoxes, Dots, GovPrintStyle, chunk, fmt, thMonthName } from "@/components/reports/gov-forms";
@@ -128,7 +128,7 @@ export default function SsoReportPage() {
               </Select>
             </FilterField>
             <FilterField label="วันที่ชำระเงิน (ในไฟล์)">
-              <input type="date" className="h-9 rounded-[var(--radius-ctl)] border border-line px-2" value={payDate} onChange={(e) => setPayDate(e.target.value)} />
+              <Input type="date" className="h-9 w-44 text-sm" value={payDate} onChange={(e) => setPayDate(e.target.value)} />
             </FilterField>
           </>
         }

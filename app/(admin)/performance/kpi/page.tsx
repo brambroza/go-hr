@@ -321,7 +321,7 @@ function ImportKpi() {
             </Select>
           </Field>
           <Button variant="secondary" onClick={template} disabled={!kpis.length}>ดาวน์โหลดไฟล์ตัวอย่าง</Button>
-          <label className={clsx("inline-flex h-10 cursor-pointer items-center gap-1.5 rounded-[var(--radius-ctl)] bg-jade-600 px-4 text-[15px] font-medium text-white hover:bg-jade-700", (!cycle || !can("performance", "edit")) && "pointer-events-none opacity-50")}>
+          <label className={clsx("inline-flex h-10 cursor-pointer items-center gap-1.5 rounded-[var(--radius-ctl)] bg-jade-600 px-4 text-[15px] font-medium text-white hover:bg-jade-700", (!cycle || !can("performance", "edit")) && "pointer-events-none !bg-line !text-ink-mute")}>
             <FileUp className="size-4" /> เลือกไฟล์ CSV
             <input type="file" accept=".csv,text/csv" className="sr-only" onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ""; if (f) onFile(f); }} />
           </label>
