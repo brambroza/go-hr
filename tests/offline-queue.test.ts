@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { markQueueError, normalizeQueue, partitionQueue, type QueuedCheckin } from "../components/ess/offline-queue-core";
+import { markQueueError, MAX_QUEUED_PHOTO_CHARS, normalizeQueue, partitionQueue, photoForQueue, type QueuedCheckin } from "../components/ess/offline-queue-core";
 
 const item = (ref: string, emp: number): QueuedCheckin => ({ client_ref: ref, log_time: "2026-10-10T01:00:00.000Z", latitude: 13.7, longitude: 100.5, accuracy: 10, direction: "auto", employee_id: emp });
 
@@ -30,4 +30,11 @@ test("markQueueError: records the error on one item and counts tries", () => {
   assert.equal(r[0].error, "อยู่นอกพื้นที่");
   assert.equal(r[0].tries, 2);
   assert.equal(r[1].error, undefined);
+});
+
+test("photoForQueue: keeps a small image data URL, drops anything else", () => {
+  assert.equal(photoForQueue("data:image/jpeg;base64,AAAA"), "data:image/jpeg;base64,AAAA");
+  assert.equal(photoForQueue("https://example.com/x.jpg"), null);
+  assert.equal(photoForQueue(null), null);
+  assert.equal(photoForQueue("data:image/jpeg;base64," + "A".repeat(MAX_QUEUED_PHOTO_CHARS + 1)), null);
 });

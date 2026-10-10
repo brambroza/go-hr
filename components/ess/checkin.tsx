@@ -12,11 +12,21 @@ import { useToday } from "./today";
 import { DAY_TYPE_LABEL, DIRECTIONS, DIRECTION_LABEL, distanceM, errText, fmtDistance, isNetworkError, SOURCE_LABEL } from "./lib";
 import { allowedLocations, DEFAULT_POLICY, gpsAllowed, parsePolicy, type CheckinPolicy } from "@/lib/attendance/checkin-policy";
 import { enqueueCheckin, onQueueChange, queuedCheckins, removeQueued, syncQueue, type QueuedCheckin } from "./offline-queue";
+import { photoForQueue } from "./offline-queue-core";
 import { QrScanner } from "./qr-scanner";
 import type { FaceCapture } from "./face-scan";
 import { toPgArray } from "./face-api-loader";
 
 // face-api + TensorFlow.js are loaded only when the "สแกนใบหน้า" tab is opened
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(String(r.result));
+    r.onerror = () => reject(r.error);
+    r.readAsDataURL(blob);
+  });
+}
+
 const FaceCamera = dynamic(() => import("./face-scan").then((m) => m.FaceCamera), {
   ssr: false,
   loading: () => <div className="grid aspect-square w-full place-items-center rounded-[var(--radius-panel)] border border-line bg-paper text-sm text-ink-soft">กำลังโหลดระบบสแกนใบหน้า…</div>,
@@ -182,13 +192,23 @@ export function CheckinScreen() {
     return r.url;
   }, [photo]);
 
-  function queueOffline(reason: string) {
+  async function queueOffline(reason: string) {
     if (!geo.fix) {
       setResult({ ok: false, message: `${reason} และยังหาตำแหน่ง GPS ไม่ได้ จึงบันทึกไว้ไม่ได้ — รอให้ GPS จับตำแหน่งได้แล้วกดอีกครั้ง` });
       return;
     }
     try {
-      const q = enqueueCheckin({ latitude: geo.fix.lat, longitude: geo.fix.lng, accuracy: geo.fix.acc, direction, employee_id: me.employeeId });
+      // keep the selfie with the queued punch (small JPEG) so locations that require a photo accept the sync later
+      let photoData: string | null = null;
+      if (photo) {
+        try {
+          const small = await resizeImage(photo.blob, 480, 0.6);
+          photoData = photoForQueue(await blobToDataUrl(small));
+        } catch {
+          photoData = null;
+        }
+      }
+      const q = enqueueCheckin({ latitude: geo.fix.lat, longitude: geo.fix.lng, accuracy: geo.fix.acc, direction, employee_id: me.employeeId, photo_data: photoData });
       setResult({ ok: true, time: q.log_time, location: anywhere ? null : nearest?.loc.name ?? null, distance: !anywhere && nearest ? Math.round(nearest.dist) : null, offline: true });
     } catch (e) {
       setResult({ ok: false, message: (e as Error).message });
@@ -212,7 +232,7 @@ export function CheckinScreen() {
         setResult({ ok: false, message: "ออฟไลน์อยู่ ลงเวลาด้วย QR ไม่ได้ — ใช้ GPS แทน ระบบจะส่งให้เมื่อกลับมาออนไลน์" });
         return;
       }
-      queueOffline("ออฟไลน์อยู่");
+      await queueOffline("ออฟไลน์อยู่");
       return;
     }
     setBusy(true);
@@ -222,7 +242,7 @@ export function CheckinScreen() {
         photoUrl = await uploadPhoto();
       } catch (e) {
         if (isNetworkError(e) && !isQr) {
-          queueOffline("ส่งข้อมูลไม่ได้");
+          await queueOffline("ส่งข้อมูลไม่ได้");
           return;
         }
         throw new Error("อัปโหลดรูปไม่สำเร็จ: " + errText(e));
@@ -238,7 +258,7 @@ export function CheckinScreen() {
       });
       if (error) {
         if (isNetworkError(error) && !isQr) {
-          queueOffline("ส่งข้อมูลไม่ได้");
+          await queueOffline("ส่งข้อมูลไม่ได้");
           return;
         }
         throw error;

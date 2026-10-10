@@ -13,9 +13,12 @@ export function supabaseBrowser() {
       // same as the library default (document.cookie), plus "remember me": no max-age when the session-only marker is set
       cookies: {
         getAll() {
+          // a Client Component is also rendered on the server (SSR) — there is no document / cookie there
+          if (typeof document === "undefined") return [];
           return parseCookieHeader(document.cookie).map((c) => ({ name: c.name, value: c.value ?? "" }));
         },
         setAll(toSet) {
+          if (typeof document === "undefined") return;
           const sessionOnly = hasSessionOnlyMarker(parseCookieHeader(document.cookie).map((c) => ({ name: c.name, value: c.value ?? "" })));
           for (const { name, value, options } of toSet) {
             document.cookie = serializeCookieHeader(name, value, persistCookieOptions(options, sessionOnly));

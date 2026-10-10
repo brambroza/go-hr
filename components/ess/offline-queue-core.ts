@@ -12,6 +12,17 @@ export interface QueuedCheckin {
   employee_id: number;
   error?: string | null; // last business error (e.g. outside area) — kept so the user can see why it failed
   tries?: number;
+  /** selfie taken while offline (small JPEG data URL) — uploaded at sync time; locations that require a photo would otherwise reject the punch forever */
+  photo_data?: string | null;
+}
+
+/** Largest photo kept per queued punch (data URL length) — localStorage is small and shared with everything else */
+export const MAX_QUEUED_PHOTO_CHARS = 200_000;
+
+/** Keep a photo only when it fits; a punch without a photo is still better than no punch */
+export function photoForQueue(dataUrl: string | null | undefined): string | null {
+  if (!dataUrl || !dataUrl.startsWith("data:image/")) return null;
+  return dataUrl.length <= MAX_QUEUED_PHOTO_CHARS ? dataUrl : null;
 }
 
 /** Parse what is in storage: drop anything that is not an object or has no employee (items from before the stamp cannot be attributed) */

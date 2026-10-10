@@ -5,6 +5,7 @@
 // (a phone can be shared), and the whole queue is dropped on sign-out (see ./logout.ts).
 
 import { supabaseBrowser } from "@/lib/supabase/client";
+import { uploadFile } from "@/lib/storage";
 import { errText, isNetworkError, uuid } from "./lib";
 import { markQueueError, normalizeQueue, partitionQueue, type QueuedCheckin } from "./offline-queue-core";
 
@@ -75,11 +76,25 @@ export function syncQueue(employeeId: number | null | undefined): Promise<{ sync
     if (typeof navigator !== "undefined" && !navigator.onLine) return { synced, failed };
     const sb = supabaseBrowser();
     for (const q of queuedCheckins(key)) {
+      // the selfie taken offline goes to storage first; a network failure keeps the item for the next round
+      let photoUrl: string | null = null;
+      if (q.photo_data) {
+        try {
+          const blob = await (await fetch(q.photo_data)).blob();
+          photoUrl = (await uploadFile("checkins", blob, { folder: q.log_time.slice(0, 10), name: "selfie.jpg" })).url;
+        } catch (e) {
+          failed++;
+          if (isNetworkError(e)) break;
+          write(markQueueError(read(), q.client_ref, "อัปโหลดรูปไม่สำเร็จ: " + errText(e)));
+          continue;
+        }
+      }
       const { error } = await sb.rpc("check_in", {
         p_method: "offline",
         p_latitude: q.latitude,
         p_longitude: q.longitude,
         p_accuracy: q.accuracy,
+        p_photo_url: photoUrl,
         p_direction: q.direction || "auto",
         p_log_time: q.log_time,
         p_client_ref: q.client_ref,

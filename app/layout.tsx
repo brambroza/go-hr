@@ -7,7 +7,7 @@ import "@fontsource/ibm-plex-sans-thai/thai-600.css";
 import "@fontsource/ibm-plex-sans-thai/latin-600.css";
 import "./globals.css";
 import { headers } from "next/headers";
-import { publicEnv } from "@/lib/public-env";
+import { ENV_META_NAME, publicEnv } from "@/lib/public-env";
 import { Toaster } from "@/components/ui";
 
 // runtime config (Supabase URL / anon key) is read per request — see lib/public-env.ts
@@ -32,6 +32,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="th" className="h-full antialiased">
       <head>
+        <meta name={ENV_META_NAME} content={JSON.stringify(publicEnv())} />
         <script nonce={nonce} dangerouslySetInnerHTML={{ __html: `window.__GOHR_ENV=${JSON.stringify(publicEnv()).replace(/</g, "\\u003c")}` }} />
       </head>
       <body className="min-h-full">
