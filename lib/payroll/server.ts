@@ -9,6 +9,7 @@ import { summarize } from "@/lib/attendance/engine";
 import { computeEntry, DEFAULT_PAYROLL_CONFIG, type EmployeePayInput, type LineInput, type PayItemDef, type PayrollConfig } from "./engine";
 import { DEFAULT_SSO_CONFIG, DEFAULT_TAX_CONFIG, type SsoConfig, type TaxConfig } from "./tax";
 import { computeLeavePay, expandLeaveRequest, nextDate, type LeaveDay, type LeaveTypeRule } from "./leave";
+import { pendingToRelease, selectPendingForPeriod, type PendingItem } from "./pending";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Q = any;
@@ -197,7 +198,7 @@ export async function calculatePeriodUnchecked(periodId: number, opts: { employe
     await sb.from("payroll_periods").select("id").in("status", ["approved", "paid", "closed"]).lt("pay_date", period.pay_date).eq("period_type", "monthly").order("pay_date", { ascending: false }).limit(1),
   ) as { id: number }[];
 
-  const [privs, positions, constants, adjustments, commissions, plans, loans, advances, guarantees, attDays, leaveReqs, leaveTypes, taxDed, family, hist, prevDil] = await Promise.all([
+  const [privs, positions, constants, adjustments, commissions, plans, loans, advances, guarantees, attDays, leaveReqs, leaveTypes, taxDed, family, hist, prevDil, pendingAll] = await Promise.all([
     fetchByIds<Priv>(ids, (part) =>
       sb.from("employee_private").select("employee_id, salary, salary_unit, pay_method, bank_code, bank_account, sso_enabled, pvd_enabled, pvd_employee_rate, pvd_employer_rate, tax_method, tax_fixed_rate, prev_employer_income, prev_employer_tax, prev_employer_sso, prev_employer_pvd, ytd_open_year, ytd_open_income, ytd_open_tax, ytd_open_sso, ytd_open_pvd").in("employee_id", part).order("employee_id"),
     ),
@@ -247,7 +248,13 @@ export async function calculatePeriodUnchecked(periodId: number, opts: { employe
     lastPrev.length
       ? inIds<{ employee_id: number; calc_detail: { diligence_step?: number | null } | null }>("payroll_entries", "id, employee_id, calc_detail", (q) => q.eq("period_id", lastPrev[0].id))
       : Promise.resolve([]),
+    // เงินค้างจ่ายรอเข้างวด (สวัสดิการ เงินสดย่อย ตกเบิก ...) — unassigned rows + rows already claimed by this period
+    inIds<PendingItem>(
+      "payroll_pending_items", "id, employee_id, pay_item_id, amount, qty, note, source, source_id, effective_date, status, period_id",
+      (q) => q.neq("status", "cancelled").or(`period_id.eq.${period.id},period_id.is.null`),
+    ),
   ]);
+  const pendingSel = selectPendingForPeriod(pendingAll, { id: period.id, period_type: period.period_type, end_date: period.end_date }, ids);
 
   // ---- index by employee -------------------------------------------------------------------------
   const group = <T extends { employee_id: number }>(rows: T[]) => {
@@ -264,6 +271,7 @@ export async function calculatePeriodUnchecked(periodId: number, opts: { employe
   const posBy = new Map(positions.map((p) => [p.id, p.name]));
   const constBy = group(constants);
   const adjBy = group(adjustments);
+  const pendingBy = group(pendingSel);
   const comBy = group(commissions);
   const planBy = new Map(plans.map((p) => [p.id, p]));
   const loanBy = group(loans);
@@ -364,6 +372,7 @@ export async function calculatePeriodUnchecked(periodId: number, opts: { employe
     const line = (item: PayItemDef | undefined, amount: number, extra: Partial<LineInput> = {}): LineInput[] => (item ? [{ item, amount: Number(amount) || 0, ...extra }] : []);
     const consts = (constBy.get(e.id) ?? []).flatMap((c) => line(itemById.get(c.pay_item_id), c.amount, { qty: c.qty, note: c.note, source: "constant", source_id: c.id }));
     const adjs = (adjBy.get(e.id) ?? []).flatMap((a) => line(itemById.get(a.pay_item_id), a.amount, { qty: a.qty, note: a.note, source: a.source ?? "manual", source_id: a.id }));
+    for (const pi of pendingBy.get(e.id) ?? []) adjs.push(...line(itemById.get(pi.pay_item_id), pi.amount, { qty: pi.qty, note: pi.note, source: pi.source, source_id: pi.id }));
     for (const c of comBy.get(e.id) ?? []) {
       const plan = c.plan_id ? planBy.get(c.plan_id) : undefined;
       const it = (plan?.pay_item_id ? itemById.get(plan.pay_item_id) : undefined) ?? commissionItem;
@@ -517,6 +526,14 @@ export async function calculatePeriodUnchecked(periodId: number, opts: { employe
     );
   });
   await insertChunks("payroll_entry_items", itemRows);
+
+  // claim the pending items that are now part of this period; release the ones that dropped out (employee no longer in the run)
+  const claim = pendingSel.filter((p) => p.status === "pending" || p.period_id == null || (p.status === "applied" && Number(p.period_id) !== period.id)).map((p) => p.id);
+  for (let i = 0; i < claim.length; i += IN_CHUNK) must(await sb.from("payroll_pending_items").update({ status: "applied", period_id: period.id }).in("id", claim.slice(i, i + IN_CHUNK)).select("id"));
+  if (!opts.employeeIds?.length) {
+    const release = pendingToRelease(pendingAll, period.id, pendingSel).map((p) => p.id);
+    for (let i = 0; i < release.length; i += IN_CHUNK) must(await sb.from("payroll_pending_items").update({ status: "pending", period_id: null }).in("id", release.slice(i, i + IN_CHUNK)).select("id"));
+  }
   must(await sb.from("payroll_periods").update({ status: "calculated", calculated_at: new Date().toISOString() }).eq("id", period.id).select("id"));
 
   return { employees: entries.length, warnings: warnCount, total_net: r2(entries.reduce((s, e) => s + Number(e.net_pay), 0)), ms: Date.now() - t0, attendance_recalc: attendanceRecalc };
@@ -582,6 +599,8 @@ export async function markPaid(periodId: number) {
     const rows = must(await sb.from("employee_guarantees").select("id, collected_amount").in("id", [...gSum.keys()])) as { id: number; collected_amount: number }[];
     for (const g of rows) must(await sb.from("employee_guarantees").update({ collected_amount: r2(Number(g.collected_amount) + gSum.get(g.id)!) }).eq("id", g.id).select("id"));
   }
+  // welfare / petty cash / retro money that rode along in this period is now paid
+  must(await sb.from("payroll_pending_items").update({ status: "paid" }).eq("period_id", periodId).eq("status", "applied").select("id"));
   must(await sb.from("payroll_periods").update({ status: "paid" }).eq("id", periodId).select("id"));
 }
 
@@ -599,6 +618,7 @@ async function refreshLoans(loanIds: number[]) {
 
 async function undoPaid(periodId: number) {
   const sb = supabaseAdmin();
+  must(await sb.from("payroll_pending_items").update({ status: "applied" }).eq("period_id", periodId).eq("status", "paid").select("id"));
   const { entries, items } = await entryItemsBySource(periodId, ["guarantee"]);
   const loanRows = must(await sb.from("loan_payments").select("loan_id").eq("period_id", periodId)) as { loan_id: number }[];
   must(await sb.from("loan_payments").delete().eq("period_id", periodId).select("id"));

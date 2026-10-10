@@ -30,7 +30,9 @@ lib/permissions.ts        MENUS, can(), Me type      lib/nav.ts  sidebar items (
 lib/auth.ts               getMe(), requireMe(), requirePerm(menu, action), safeAction()  (server only)
 lib/supabase/{client,server,admin}.ts   browser / server (user session, RLS) / service-role clients
 lib/format.ts             Thai dates (พ.ศ.), money, bahtText, masking, minutesToHM
-lib/storage.ts            uploadFile(bucket, file), signedUrl(ref), resizeImage()
+lib/storage.ts            uploadFile(bucket, file), signedUrl(ref), resizeImage()   (rules per bucket: lib/upload-rules.ts)
+lib/security-headers.ts   CSP (nonce, report-only until CSP_ENFORCE=1) + static headers; violations → /api/csp-report
+lib/payroll/pending.ts    payroll_pending_items: money waiting for the next monthly period (welfare, petty cash, retro ...)
 lib/csv.ts                downloadCsv, parseCsv
 lib/attendance/engine.ts  computeDay(), summarize()           (pure, tests in tests/)
 lib/payroll/{engine,tax}.ts  computeEntry(), monthlyWithholding(), ssoContribution()

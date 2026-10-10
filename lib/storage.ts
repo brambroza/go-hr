@@ -1,25 +1,35 @@
 "use client";
 import { supabaseBrowser } from "./supabase/client";
 import { publicEnv } from "./public-env";
+import { checkUpload, mimeFromName, type Bucket } from "./upload-rules";
 
-export type Bucket = "public" | "avatars" | "documents" | "attachments" | "checkins" | "resumes";
+export type { Bucket } from "./upload-rules";
+export { acceptFor, BUCKET_RULES } from "./upload-rules";
 
 /**
  * Upload a file from the browser. Path is prefixed with the user's id (storage RLS requires it for
  * non-HR users). Returns the storage path plus a URL: public URL for public buckets, otherwise the path
  * (resolve with signedUrl() when displaying).
+ *
+ * Before uploading, the file is checked against the bucket's rules (size, allowed types, real signature) —
+ * the Storage API enforces the same limits, this just fails fast with a readable message.
  */
 export async function uploadFile(bucket: Bucket, file: File | Blob, opts: { folder?: string; name?: string } = {}) {
   const sb = supabaseBrowser();
   const { data: auth } = await sb.auth.getUser();
-  const ext = (opts.name ?? (file instanceof File ? file.name : "file.bin")).split(".").pop()?.toLowerCase() ?? "bin";
+  const fileName = opts.name ?? (file instanceof File ? file.name : "file.bin");
+  const contentType = (file as File).type || mimeFromName(fileName) || "";
+  const head = new Uint8Array(await file.slice(0, 64).arrayBuffer());
+  const problem = checkUpload(bucket, { type: contentType, size: file.size, name: fileName }, head);
+  if (problem) throw new Error(problem);
+  const ext = fileName.split(".").pop()?.toLowerCase() ?? "bin";
   const safeName = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
   const path = [auth.user?.id ?? "anon", opts.folder, safeName].filter(Boolean).join("/");
-  const { error } = await sb.storage.from(bucket).upload(path, file, { upsert: false, contentType: (file as File).type || undefined });
+  const { error } = await sb.storage.from(bucket).upload(path, file, { upsert: false, contentType: contentType || undefined });
   if (error) throw error;
   const isPublic = bucket === "public" || bucket === "avatars";
   const url = isPublic ? sb.storage.from(bucket).getPublicUrl(path).data.publicUrl : `${bucket}/${path}`;
-  return { path, url, name: file instanceof File ? file.name : safeName, type: (file as File).type ?? "" };
+  return { path, url, name: file instanceof File ? file.name : safeName, type: contentType };
 }
 
 /** Resolve a stored reference ("bucket/path" or full URL) to a viewable URL */

@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { STATIC_SECURITY_HEADERS } from "./lib/security-headers";
 
 const nextConfig: NextConfig = {
   // Self-hosted on the customer's server: build a standalone server bundle for Docker
@@ -12,6 +13,10 @@ const nextConfig: NextConfig = {
         as: "*.css",
       },
     },
+  },
+  // Content-Security-Policy is per request (nonce) → proxy.ts; the static ones live here
+  async headers() {
+    return [{ source: "/(.*)", headers: STATIC_SECURITY_HEADERS }];
   },
   async redirects() {
     return [

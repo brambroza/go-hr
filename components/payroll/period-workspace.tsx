@@ -14,11 +14,12 @@ import { calculateAction, workflowAction } from "@/app/(admin)/payroll/actions";
 import { EntryDetailModal } from "./entry-detail";
 import { AdjustmentsTab } from "./adjustments-tab";
 import { CommissionsTab } from "./commissions-tab";
+import { PendingTab } from "./pending-tab";
 import { exportCashList, exportRegister } from "./exports";
 import { BankFileModal } from "./bank-file-modal";
 import { ENTRY_COLS, type Entry, type PeriodFull } from "./types";
 
-type Tab = "entries" | "adjustments" | "commissions";
+type Tab = "entries" | "adjustments" | "pending" | "commissions";
 
 export function PeriodWorkspace({ id }: { id: number }) {
   const sb = supabaseBrowser();
@@ -200,6 +201,7 @@ export function PeriodWorkspace({ id }: { id: number }) {
         tabs={[
           { value: "entries", label: "รายการเงินเดือน", count: all.length },
           { value: "adjustments", label: "รายรับรายจ่ายงวดนี้" },
+          { value: "pending", label: "รอเข้างวด (สวัสดิการ / เงินสดย่อย)" },
           { value: "commissions", label: "ค่าคอมมิชชั่น" },
         ]}
       />
@@ -351,6 +353,11 @@ export function PeriodWorkspace({ id }: { id: number }) {
       {tab === "adjustments" && (
         <Panel>
           <AdjustmentsTab periodId={id} editable={editable} onChanged={() => setDirty(true)} />
+        </Panel>
+      )}
+      {tab === "pending" && (
+        <Panel>
+          <PendingTab period={{ id, period_type: period.period_type, end_date: period.end_date, status: st }} editable={editable} onChanged={() => setDirty(true)} />
         </Panel>
       )}
       {tab === "commissions" && (

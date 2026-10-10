@@ -8,6 +8,7 @@ import { useSetting } from "./use-setting";
 import Link from "next/link";
 import { LEGACY_BANK_KEYS } from "@/lib/payroll/files";
 import { useFileLayouts } from "@/components/payroll/file-export";
+import { usePayrollLookups } from "@/components/payroll/use-payroll-lookups";
 
 // ---------------------------------------------------------------- types & defaults (mirror supabase/seed.sql)
 type Att = {
@@ -26,10 +27,15 @@ type Pay = {
   daily_divisor: number; hours_per_day: number; round_mode: string; advance_limit_percent: number; prorate_new_joiner: boolean;
   deduct_absent: boolean; deduct_late: boolean; deduct_early: boolean; payslip_password: string; payslip_show_ytd?: boolean; payslip_note?: string;
   bank_file_format: string; company_bank: { bank_code: string; account: string; branch: string; company_id?: string; sender_name?: string };
+  /** เงินสดย่อยที่อนุมัติแล้ว: payroll = เข้าเงินเดือนงวดถัดไป (ค่าเริ่มต้น), cash = จ่ายเงินสดนอกระบบเงินเดือน */
+  petty_cash_mode?: "payroll" | "cash";
+  /** รายการเงินเดือนที่ใช้จ่ายเงินสดย่อย — ว่าง = รายการที่มี system_key petty_cash (เงินเบิกคืน) */
+  petty_cash_pay_item_id?: number | null;
 };
 const PAY: Pay = {
   daily_divisor: 30, hours_per_day: 8, round_mode: "satang", advance_limit_percent: 50, prorate_new_joiner: true, deduct_absent: true, deduct_late: true, deduct_early: true,
   payslip_password: "birthdate", payslip_show_ytd: true, payslip_note: "", bank_file_format: "bank_generic_csv", company_bank: { bank_code: "004", account: "", branch: "", company_id: "" },
+  petty_cash_mode: "payroll", petty_cash_pay_item_id: null,
 };
 type Bracket = { upto: number | null; rate: number };
 type Deduction = { code: string; name: string; max?: number; per_unit?: number; group?: string; retirement?: boolean; donation?: boolean; multiplier?: number };
@@ -224,8 +230,10 @@ function PayrollTab() {
   const { value: v, setValue, save, saving } = useSetting<Pay>("payroll", PAY);
   const [err, setErr] = useState<string | null>(null);
   const { layouts: bankLayouts } = useFileLayouts("bank");
+  const { items: payItems } = usePayrollLookups();
   if (!v) return <Loading />;
   const set = (p: Partial<Pay>) => setValue({ ...v, ...p });
+  const pettyItems = payItems.filter((i) => i.is_active && i.direction === 1 && ["welfare", "income"].includes(i.category));
   const bank = { ...PAY.company_bank, ...v.company_bank };
   const setBank = (p: Partial<Pay["company_bank"]>) => set({ company_bank: { ...bank, ...p } });
   const submit = () => {
@@ -254,6 +262,20 @@ function PayrollTab() {
           <Row label="หักเงินเมื่อมาสาย"><Toggle checked={v.deduct_late} onChange={(x) => set({ deduct_late: x })} /></Row>
           <Row label="หักเงินเมื่อกลับก่อน"><Toggle checked={v.deduct_early} onChange={(x) => set({ deduct_early: x })} /></Row>
           <Row label="เพดานเบิกเงินล่วงหน้า" hint="% ของเงินเดือน"><Num value={v.advance_limit_percent} suffix="%" onChange={(x) => set({ advance_limit_percent: x })} /></Row>
+        </Panel>
+        <Panel title="สวัสดิการและเงินสดย่อย">
+          <Row label="เงินสดย่อยที่อนุมัติแล้ว" hint="เข้าเงินเดือน = ระบบบันทึกเป็นรายรับในงวดรายเดือนถัดไปอัตโนมัติ (ดูที่แท็บ “รอเข้างวด” ของงวด)">
+            <Select value={v.petty_cash_mode ?? "payroll"} onChange={(e) => set({ petty_cash_mode: e.target.value as Pay["petty_cash_mode"] })}>
+              <option value="payroll">จ่ายผ่านเงินเดือน (เข้างวดถัดไป)</option>
+              <option value="cash">จ่ายเงินสด ไม่เข้าเงินเดือน</option>
+            </Select>
+          </Row>
+          <Row label="รายการเงินเดือนสำหรับเงินสดย่อย" hint="ว่าง = “เงินเบิกคืน (เงินสดย่อย)” · สวัสดิการแต่ละประเภทตั้งรายการของตัวเองที่ เงินเดือน → สวัสดิการ">
+            <Select value={v.petty_cash_pay_item_id ?? ""} disabled={(v.petty_cash_mode ?? "payroll") !== "payroll"} onChange={(e) => set({ petty_cash_pay_item_id: e.target.value ? Number(e.target.value) : null })}>
+              <option value="">— ค่าเริ่มต้น (REIMBURSE) —</option>
+              {pettyItems.map((i) => <option key={i.id} value={i.id}>{i.code} · {i.name}</option>)}
+            </Select>
+          </Row>
         </Panel>
         <Panel title="บัญชีบริษัทและไฟล์โอนเงิน">
           <div className="grid gap-4 sm:grid-cols-2">

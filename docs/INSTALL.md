@@ -61,6 +61,11 @@ sudo deploy/install.sh \
   (เก็บที่ `/var/backups/gohr` 30 วัน — ควรคัดลอกออกนอกเครื่องด้วย)
 - กู้คืนฐานข้อมูล: `docker exec -i supabase-db pg_restore -U supabase_admin -d postgres --clean --if-exists < db-YYYYMMDD-HHMM.dump`
 - อัปเกรดเวอร์ชัน: `cd /opt/gohr && sudo git pull && sudo deploy/install.sh --domain <เดิม>` (ปรับฐานข้อมูลเฉพาะส่วนที่เพิ่มใหม่ ข้อมูลเดิมไม่หาย)
+- เวอร์ชันของ Supabase / Caddy ที่ตัวติดตั้งใช้ล็อกไว้ใน `deploy/versions.env` — ติดตั้งซ้ำกี่ครั้งก็ได้ชุดเดิม
+  การอัปเกรด Supabase ต้องตั้งใจทำ: แก้ `SUPABASE_REF` → ทดสอบบน staging → สำรองข้อมูล → ลบ `deploy/supabase/docker-compose.yml` แล้วรัน `install.sh` ใหม่
+- Content-Security-Policy เริ่มแบบ **รายงานอย่างเดียว** (ไม่บล็อก) ดูรายงานได้จาก `docker compose logs app | grep csp-report`
+  เมื่อใช้งานจริง 2 สัปดาห์แล้วไม่มีรายงานผิดปกติ ให้ตั้ง `CSP_ENFORCE=1` ใน `deploy/.env` แล้ว `docker compose up -d`
+  (ถ้าต้องโหลดสคริปต์/รูปจากโดเมนอื่น เช่น LINE LIFF ให้ใส่ `CSP_EXTRA_ORIGINS=https://host1,https://host2`)
 - ดูสถานะ: `cd /opt/gohr/deploy && docker compose ps` · ดู log: `docker compose logs -f app`
 - อย่าเปิดพอร์ต 8000 (Supabase Studio) และ 5432 สู่อินเทอร์เน็ต — เปิดเฉพาะ 80/443
 

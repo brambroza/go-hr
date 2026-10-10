@@ -6,6 +6,7 @@ import "@fontsource/ibm-plex-sans-thai/latin-500.css";
 import "@fontsource/ibm-plex-sans-thai/thai-600.css";
 import "@fontsource/ibm-plex-sans-thai/latin-600.css";
 import "./globals.css";
+import { headers } from "next/headers";
 import { publicEnv } from "@/lib/public-env";
 import { Toaster } from "@/components/ui";
 
@@ -25,11 +26,13 @@ export const viewport: Viewport = {
   initialScale: 1,
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default async function RootLayout({ children }: LayoutProps<"/">) {
+  // CSP nonce set by proxy.ts — the only inline script we render ourselves must carry it
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
   return (
     <html lang="th" className="h-full antialiased">
       <head>
-        <script dangerouslySetInnerHTML={{ __html: `window.__GOHR_ENV=${JSON.stringify(publicEnv()).replace(/</g, "\\u003c")}` }} />
+        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: `window.__GOHR_ENV=${JSON.stringify(publicEnv()).replace(/</g, "\\u003c")}` }} />
       </head>
       <body className="min-h-full">
         {children}

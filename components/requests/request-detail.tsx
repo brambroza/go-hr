@@ -9,6 +9,7 @@ import { money, minutesToHM, num, thDate, thDateTime, thTime, bahtText } from "@
 import { useCan, useMaybeMe } from "@/components/app/me-context";
 import { Badge, Button, Field, Spinner, Textarea, clsx, toast, useConfirm } from "@/components/ui";
 import { DIRECTION, DOC_LANG, LEAVE_UNIT, REQUEST_STATUS, STEP_STATUS, empName, errMsg, isPrintable, normalizeAttachments, type RequestRow } from "./lib";
+import { PENDING_STATUS_LABEL } from "@/lib/payroll/pending";
 
 export interface RequestDetailProps {
   requestId: number;
@@ -147,6 +148,7 @@ export function RequestDetail({ requestId, onChanged, actions = "none" }: Reques
       {/* details */}
       <dl className="grid grid-cols-1 gap-x-6 gap-y-3 sm:grid-cols-2">
         <PayloadFields row={row} lk={lk} />
+        {row.status === "approved" && (row.request_type === "welfare" || row.request_type === "petty_cash") && <PayrollPendingNote requestId={row.id} source={row.request_type} />}
         {row.reason && <KV k={row.request_type === "complaint" ? "รายละเอียด" : "เหตุผล"} v={<span className="whitespace-pre-wrap">{row.reason}</span>} wide />}
       </dl>
 
@@ -249,6 +251,38 @@ const HIDDEN_KEYS = new Set([
   "items", "welfare_type_id", "welfare_type_name", "purpose", "language", "copies", "last_day", "travel_from", "travel_to", "country",
   "embassy", "document_no", "from_time", "date", "confidential", "last_working_date", "topic", "issued_at", "issued_by", "contract_start", "contract_end", "subject", "topic", "client_uuid", "offline_id",
 ]);
+
+/** Where the approved money is on the payroll side (visible to users with payroll permission; others see nothing) */
+function PayrollPendingNote({ requestId, source }: { requestId: number; source: string }) {
+  const sb = supabaseBrowser();
+  const [rows, setRows] = useState<{ status: string; amount: number; period: { name: string } | null }[] | null>(null);
+  useEffect(() => {
+    sb.from("payroll_pending_items")
+      .select("status, amount, period:payroll_periods(name)")
+      .eq("source", source)
+      .eq("source_id", requestId)
+      .then(({ data }: { data: unknown }) => setRows(((data ?? []) as unknown) as { status: string; amount: number; period: { name: string } | null }[]));
+  }, [sb, requestId, source]);
+  if (!rows?.length) return null;
+  const r = rows[0];
+  const text =
+    r.status === "pending" ? "รอเข้างวดเงินเดือนรายเดือนถัดไป"
+    : r.status === "applied" ? `อยู่ในงวด ${r.period?.name ?? ""} (ยังไม่จ่าย)`
+    : r.status === "paid" ? `จ่ายแล้วในงวด ${r.period?.name ?? ""}`
+    : "ยกเลิกแล้ว ไม่เข้าเงินเดือน";
+  return (
+    <KV
+      k="เงินเดือน"
+      v={
+        <span className="inline-flex items-center gap-2">
+          <Badge color={r.status === "paid" ? "green" : r.status === "cancelled" ? "gray" : "amber"}>{PENDING_STATUS_LABEL[r.status as keyof typeof PENDING_STATUS_LABEL] ?? r.status}</Badge>
+          <span className="text-sm text-ink-soft">{text}</span>
+        </span>
+      }
+      wide
+    />
+  );
+}
 
 function PayloadFields({ row, lk }: { row: RequestRow; lk: Lookups }) {
   const p = row.payload ?? {};

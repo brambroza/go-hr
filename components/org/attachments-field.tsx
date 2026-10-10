@@ -3,11 +3,9 @@
 import { useRef, useState } from "react";
 import { FileText, Paperclip, X } from "lucide-react";
 import { Button, toast } from "@/components/ui";
-import { signedUrl, uploadFile, type Bucket } from "@/lib/storage";
+import { BUCKET_RULES, acceptFor, signedUrl, uploadFile, type Bucket } from "@/lib/storage";
 
 export type Attachment = { name: string; url: string; type?: string };
-
-const MAX_MB = 20;
 
 /** Open a stored file ("bucket/path" or URL) in a new tab */
 export async function openStored(ref: string) {
@@ -33,12 +31,12 @@ export function AttachmentsField({ value, onChange, bucket = "documents", folder
     const added: Attachment[] = [];
     try {
       for (const f of Array.from(files)) {
-        if (f.size > MAX_MB * 1024 * 1024) {
-          toast.error(`ไฟล์ ${f.name} ใหญ่เกิน ${MAX_MB} MB`);
-          continue;
+        try {
+          const r = await uploadFile(bucket, f, { folder });
+          added.push({ name: r.name, url: r.url, type: r.type });
+        } catch (e) {
+          toast.error(`${f.name}: ${e instanceof Error ? e.message : String(e)}`);
         }
-        const r = await uploadFile(bucket, f, { folder });
-        added.push({ name: r.name, url: r.url, type: r.type });
       }
       onChange([...list, ...added]);
       if (added.length) toast.ok(`แนบไฟล์แล้ว ${added.length} ไฟล์ กด “บันทึก” เพื่อยืนยัน`);
@@ -71,11 +69,11 @@ export function AttachmentsField({ value, onChange, bucket = "documents", folder
       )}
       {!disabled && (
         <div>
-          <input ref={input} type="file" multiple className="sr-only" onChange={(e) => onFiles(e.target.files)} tabIndex={-1} aria-hidden />
+          <input ref={input} type="file" multiple accept={acceptFor(bucket)} className="sr-only" onChange={(e) => onFiles(e.target.files)} tabIndex={-1} aria-hidden />
           <Button size="sm" variant="secondary" icon={<Paperclip className="size-4" />} loading={busy} onClick={() => input.current?.click()}>
             แนบไฟล์
           </Button>
-          <span className="ml-2 text-xs text-ink-mute">PDF, รูปภาพ, Word, Excel ไม่เกิน {MAX_MB} MB ต่อไฟล์</span>
+          <span className="ml-2 text-xs text-ink-mute">{BUCKET_RULES[bucket].hint} ต่อไฟล์</span>
         </div>
       )}
     </div>

@@ -25,11 +25,12 @@ export function CompanyForm() {
 
   const onLogo = async (f?: File) => {
     if (!f) return;
-    if (!f.type.startsWith("image/")) return toast.error("เลือกไฟล์รูปภาพ (PNG, JPG, SVG)");
+    if (!["image/png", "image/jpeg", "image/webp"].includes(f.type)) return toast.error("เลือกไฟล์รูปภาพ PNG, JPG หรือ WebP (ไม่รองรับ SVG)");
     setUploading(true);
     try {
-      const blob = f.type === "image/svg+xml" ? f : await resizeImage(f, 512, 0.9);
-      const r = await uploadFile("public", blob, { folder: "company", name: f.type === "image/svg+xml" ? "logo.svg" : "logo.jpg" });
+      // re-encoded in the browser → what reaches the public bucket is always a plain JPEG
+      const blob = await resizeImage(f, 512, 0.9);
+      const r = await uploadFile("public", blob, { folder: "company", name: "logo.jpg" });
       set({ logo_url: r.url });
       toast.ok("อัปโหลดโลโก้แล้ว กด “บันทึก” เพื่อใช้งาน");
     } catch (e) {
@@ -87,7 +88,7 @@ export function CompanyForm() {
                   <div className="flex flex-col gap-2">
                     <label className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-[var(--radius-ctl)] border border-line bg-white px-3 text-sm hover:bg-jade-50">
                       <ImagePlus className="size-4" /> เลือกรูป
-                      <input type="file" accept="image/*" hidden onChange={(e) => onLogo(e.target.files?.[0])} />
+                      <input type="file" accept="image/png,image/jpeg,image/webp" hidden onChange={(e) => onLogo(e.target.files?.[0])} />
                     </label>
                     {v.logo_url && <Button variant="ghost" size="sm" icon={<X className="size-4" />} onClick={() => set({ logo_url: null })}>เอาโลโก้ออก</Button>}
                   </div>

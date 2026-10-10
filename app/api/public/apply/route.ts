@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { z } from "zod";
 import { supabaseAdmin } from "@/lib/supabase/admin";
+import { checkUpload, mimeFromName } from "@/lib/upload-rules";
 
 // Public job application (no login). Validated with zod, rate limited per IP (in memory), honeypot field,
 // files go to the private "resumes" bucket through the service role, HR users with recruit permission are notified.
@@ -138,9 +139,14 @@ export async function POST(req: NextRequest) {
     if (!(f instanceof File) || f.size === 0) return null;
     if (f.size > MAX_FILE) throw new Error(`${label}ใหญ่เกิน 5 MB`);
     if (!types.includes(f.type) && !exts.test(f.name)) throw new Error(`${label}ต้องเป็นไฟล์ ${key === "resume" ? "PDF หรือ Word" : "JPG / PNG"}`);
+    const buf = Buffer.from(await f.arrayBuffer());
+    const type = f.type || mimeFromName(f.name) || "";
+    // real signature check — a script file renamed to .pdf / .jpg is refused
+    const problem = checkUpload("resumes", { type, size: f.size, name: f.name }, new Uint8Array(buf.subarray(0, 64)));
+    if (problem) throw new Error(`${label}: ${problem}`);
     const ext = (f.name.split(".").pop() ?? "bin").toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 5) || "bin";
     const path = `careers/${today.slice(0, 7)}/${Date.now()}-${Math.random().toString(36).slice(2, 10)}.${ext}`;
-    const { error } = await sb.storage.from("resumes").upload(path, Buffer.from(await f.arrayBuffer()), { contentType: f.type || "application/octet-stream" });
+    const { error } = await sb.storage.from("resumes").upload(path, buf, { contentType: type });
     if (error) throw new Error("อัปโหลดไฟล์ไม่สำเร็จ กรุณาลองใหม่");
     return `resumes/${path}`;
   }

@@ -55,12 +55,22 @@ setenv() { # file key value  (replace or append)
 
 PUBLIC_URL="https://$DOMAIN"
 
+# pinned versions (Supabase commit, Caddy image ...) — see deploy/versions.env
+# shellcheck disable=SC1091
+. "$DEPLOY_DIR/versions.env"
+APP_VERSION=$(sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' "$ROOT/package.json" | head -1)
+
 # ---------------------------------------------------------------- 1. Supabase (official docker setup)
-step "เตรียม Supabase"
+step "เตรียม Supabase (ref ${SUPABASE_REF:0:12})"
 if [ ! -f supabase/docker-compose.yml ]; then
   tmp=$(mktemp -d)
-  git clone --depth 1 https://github.com/supabase/supabase "$tmp/supabase"
+  # fetch exactly the pinned commit (no branch checkout → no surprise upgrade)
+  git -C "$tmp" init -q supabase
+  git -C "$tmp/supabase" remote add origin https://github.com/supabase/supabase.git
+  git -C "$tmp/supabase" fetch -q --depth 1 origin "$SUPABASE_REF"
+  git -C "$tmp/supabase" checkout -q FETCH_HEAD
   mkdir -p supabase && cp -rf "$tmp/supabase/docker/." supabase/ && rm -rf "$tmp"
+  echo "$SUPABASE_REF" > supabase/.gohr-supabase-ref
   cp supabase/.env.example supabase/.env
   JWT_SECRET=$(rand 32)
   setenv supabase/.env POSTGRES_PASSWORD "$(rand 20)"
@@ -109,8 +119,12 @@ setenv .env APP_URL "$PUBLIC_URL"
 setenv .env GOHR_DOMAIN "$DOMAIN"
 setenv .env TLS_MODE "$TLS"
 setenv .env SUPABASE_NETWORK "supabase_default"
+setenv .env CADDY_IMAGE "${CADDY_IMAGE:-caddy:2.10.2-alpine}"
+setenv .env CRON_IMAGE "${CRON_IMAGE:-alpine:3.20}"
+grep -q '^CSP_ENFORCE=' .env || setenv .env CSP_ENFORCE "0"     # Content-Security-Policy report-only; set 1 to enforce
 [ -n "$LICENSE" ] && setenv .env GOHR_LICENSE "$LICENSE"
-[ -n "$IMAGE" ] && setenv .env GOHR_IMAGE "$IMAGE"
+# the app image is tagged with the version in package.json so "latest" never silently changes meaning
+if [ -n "$IMAGE" ]; then setenv .env GOHR_IMAGE "$IMAGE"; else setenv .env GOHR_IMAGE "gohr/app:${APP_VERSION:-dev}"; fi
 chmod 600 .env supabase/.env
 
 step "สร้างและเริ่มระบบ GO HR"

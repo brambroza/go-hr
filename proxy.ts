@@ -2,12 +2,32 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { AUTH_COOKIE, hasSessionOnlyMarker, persistCookieOptions } from "@/lib/supabase/cookie";
 import { publicEnv, serverSupabaseUrl } from "@/lib/public-env";
+import { buildCsp, cspHeaderName, isTruthyEnv, makeNonce } from "@/lib/security-headers";
 
 // Paths that work without a signed-in user
-const PUBLIC_PREFIXES = ["/login", "/forgot-password", "/reset-password", "/careers", "/kiosk", "/api/public", "/api/cron", "/api/device", "/api/line", "/manifest.webmanifest", "/sw.js", "/icons"];
+const PUBLIC_PREFIXES = ["/login", "/forgot-password", "/reset-password", "/careers", "/kiosk", "/api/public", "/api/cron", "/api/device", "/api/line", "/api/csp-report", "/manifest.webmanifest", "/sw.js", "/icons"];
 
 export async function proxy(request: NextRequest) {
-  let response = NextResponse.next({ request });
+  // Content-Security-Policy with a per-request nonce. Next.js reads the nonce from the *request* header
+  // "content-security-policy" and stamps it on every inline <script> it renders; app/layout.tsx reads x-nonce
+  // for its own inline script. The browser gets the policy as report-only until CSP_ENFORCE=1.
+  const nonce = makeNonce();
+  const csp = buildCsp({
+    nonce,
+    supabaseUrl: publicEnv().supabaseUrl,
+    dev: process.env.NODE_ENV !== "production",
+    extraOrigins: (process.env.CSP_EXTRA_ORIGINS ?? "").split(/[,\s]+/).filter(Boolean),
+  });
+  const cspHeader = cspHeaderName(isTruthyEnv(process.env.CSP_ENFORCE));
+  const withNonce = () => {
+    const h = new Headers(request.headers);
+    h.set("x-nonce", nonce);
+    h.set("content-security-policy", csp);
+    const res = NextResponse.next({ request: { headers: h } });
+    res.headers.set(cspHeader, csp);
+    return res;
+  };
+  let response = withNonce();
 
   const supabase = createServerClient(
     serverSupabaseUrl(),
@@ -22,7 +42,7 @@ export async function proxy(request: NextRequest) {
           // "remember me" off → the refreshed auth cookie must stay a session cookie
           const sessionOnly = hasSessionOnlyMarker(request.cookies.getAll());
           toSet.forEach(({ name, value }) => request.cookies.set(name, value));
-          response = NextResponse.next({ request });
+          response = withNonce();
           toSet.forEach(({ name, value, options }) => response.cookies.set(name, value, persistCookieOptions(options, sessionOnly)));
         },
       },
@@ -41,7 +61,9 @@ export async function proxy(request: NextRequest) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("next", path + request.nextUrl.search);
-    return NextResponse.redirect(url);
+    const redirect = NextResponse.redirect(url);
+    redirect.headers.set(cspHeader, csp);
+    return redirect;
   }
   return response;
 }

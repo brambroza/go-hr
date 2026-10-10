@@ -1,5 +1,6 @@
 # GO HR application stack. Supabase runs from its own official compose project (deploy/supabase, created by install.sh);
 # this stack joins Supabase's docker network to reach Kong (API gateway) as http://kong:8000.
+# Image versions are pinned in deploy/versions.env (written to .env by install.sh).
 name: gohr
 
 services:
@@ -16,7 +17,7 @@ services:
 
   # Calls the scheduler endpoint every minute (attendance calculation, reminders, LINE/e-mail dispatch, automation ...)
   cron:
-    image: alpine:3.20
+    image: ${CRON_IMAGE:-alpine:3.20}
     restart: unless-stopped
     env_file: .env
     command: >
@@ -26,7 +27,7 @@ services:
 
   # HTTPS reverse proxy — one origin for the web app and the Supabase API (needed for GPS check-in on phones)
   caddy:
-    image: caddy:2-alpine
+    image: ${CADDY_IMAGE:-caddy:2.10.2-alpine}
     restart: unless-stopped
     ports: ["80:80", "443:443"]
     env_file: .env
