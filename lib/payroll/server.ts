@@ -163,7 +163,6 @@ export async function calculatePeriodUnchecked(periodId: number, opts: { employe
   const attFrom = period.att_start_date ?? period.start_date;
   const attTo = period.att_end_date ?? period.end_date;
   const monthFirst = firstOfMonth(period.pay_year, period.pay_month);
-  const yearStart = `${period.pay_year}-01-01`;
 
   // ---- attendance recalculation (module from the attendance team; optional) -------------------
   let attendanceRecalc = "skipped";
