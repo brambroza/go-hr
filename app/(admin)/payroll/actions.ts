@@ -39,6 +39,9 @@ export async function workflowAction(id: number, action: "approve" | "reopen" | 
       msg = `เผยแพร่สลิปแล้ว แจ้งเตือนพนักงาน ${r.notified} คน`;
     } else if (action === "unpublish") (await publishPayslips(id, false), (msg = "ยกเลิกการเผยแพร่สลิปแล้ว"));
     else if (action === "delete") (await deletePeriod(id), (msg = "ลบงวดแล้ว"));
+    // the status change itself is written with the service role (audit trigger would say "ระบบ") — record who pressed the button
+    const me = await requirePerm("payroll", "view");
+    await supabaseAdmin().from("audit_logs").insert({ user_id: me.userId, user_name: me.displayName, action: `PAYROLL_${action.toUpperCase()}`, table_name: "payroll_periods", record_id: String(id), note: msg });
     done(id);
     return msg;
   });

@@ -9,7 +9,7 @@ import { summarize } from "@/lib/attendance/engine";
 import { computeEntry, DEFAULT_PAYROLL_CONFIG, type EmployeePayInput, type LineInput, type PayItemDef, type PayrollConfig } from "./engine";
 import { DEFAULT_SSO_CONFIG, DEFAULT_TAX_CONFIG, type SsoConfig, type TaxConfig } from "./tax";
 import { computeLeavePay, expandLeaveRequest, nextDate, type LeaveDay, type LeaveTypeRule } from "./leave";
-import { pendingToRelease, selectPendingForPeriod, type PendingItem } from "./pending";
+import { PENDING_SOURCE_LABEL, pendingToRelease, selectPendingForPeriod, type PendingItem } from "./pending";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Q = any;
@@ -552,7 +552,35 @@ export async function approvePeriod(periodId: number) {
   const me = await requirePerm("payroll", "approve");
   const { count } = await supabaseAdmin().from("payroll_entries").select("id", { count: "exact", head: true }).eq("period_id", periodId);
   if (!count) throw new Error("ยังไม่มีรายการเงินเดือน กรุณาคำนวณก่อนอนุมัติ");
+  const stale = await staleCalculationReasons(periodId);
+  if (stale.length) throw new Error(`ผลคำนวณล้าสมัย: ${stale.join(", ")} — กรุณากด "คำนวณเงินเดือน" ใหม่ก่อนอนุมัติ`);
   await setStatus(periodId, ["calculated"], "approved", { approved_at: new Date().toISOString(), approved_by: me.userId });
+}
+
+/**
+ * Why the current calculation no longer matches the inbox of welfare / petty-cash / retro money:
+ *   * a pay line still references a pending item that was cancelled after the calculation (money would be overpaid)
+ *   * an item approved after the calculation is still waiting and belongs in this (monthly) period (money would be missing)
+ * Empty array = up to date.
+ */
+export async function staleCalculationReasons(periodId: number): Promise<string[]> {
+  const sb = supabaseAdmin();
+  const period = await loadPeriod(periodId);
+  const out: string[] = [];
+  const { entries, items } = await entryItemsBySource(periodId, Object.keys(PENDING_SOURCE_LABEL));
+  const refs = [...new Set(items.map((i) => i.source_id).filter((v): v is number => v != null))];
+  if (refs.length) {
+    const cancelled = await fetchByIds<{ id: number }>(refs, (part) => sb.from("payroll_pending_items").select("id").in("id", part).eq("status", "cancelled"));
+    if (cancelled.length) out.push(`รายการที่ถูกยกเลิกหลังคำนวณ ${cancelled.length} รายการ`);
+  }
+  if (period.period_type === "monthly" && entries.length) {
+    const waiting = await fetchByIds<{ id: number }>(
+      entries.map((e) => e.employee_id),
+      (part) => sb.from("payroll_pending_items").select("id").in("employee_id", part).eq("status", "pending").is("period_id", null).lte("effective_date", period.end_date),
+    );
+    if (waiting.length) out.push(`สวัสดิการ / เงินสดย่อยที่อนุมัติหลังคำนวณ ${waiting.length} รายการ`);
+  }
+  return out;
 }
 
 /** back to 'calculated' (undoes "paid" side effects when needed); not allowed once closed */
