@@ -46,13 +46,19 @@ export function LoginForm({ next }: { next: string }) {
       /* ignore */
     }
     const sb = supabaseBrowser();
-    let email = login.trim();
-    if (!email.includes("@")) {
-      const { data } = await sb.rpc("resolve_login", { p_login: email });
-      email = (data as string | null) ?? `${email}@invalid.local`;
+    const typed = login.trim();
+    // username / employee code / e-mail → auth e-mail; raises while the account is locked (password policy)
+    const resolved = await sb.rpc("resolve_login", { p_login: typed });
+    if (resolved.error) {
+      setLoading(false);
+      setError(resolved.error.message);
+      return;
     }
+    const email = (resolved.data as string | null) ?? (typed.includes("@") ? typed : `${typed}@invalid.local`);
     const { error } = await sb.auth.signInWithPassword({ email, password });
     if (error) {
+      // count the failure for the lockout policy (silent for unknown logins)
+      sb.rpc("login_failed", { p_login: typed }).then(() => undefined, () => undefined);
       setLoading(false);
       setError(error.message.includes("Invalid login") ? "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง" : error.message);
       return;

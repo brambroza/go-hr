@@ -3,7 +3,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Plus, Trash2 } from "lucide-react";
 import { useCan } from "@/components/app/me-context";
-import { Button, Checkbox, Field, Input, PageHeader, Panel, Select, Spinner, Tabs, Textarea, Toggle, clsx } from "@/components/ui";
+import { Button, Field, Input, PageHeader, Panel, Select, Spinner, Tabs, Textarea, Toggle, clsx } from "@/components/ui";
 import { useSetting } from "./use-setting";
 import Link from "next/link";
 import { LEGACY_BANK_KEYS } from "@/lib/payroll/files";
@@ -163,13 +163,7 @@ function AttendanceTab() {
           <Row label="พนักงานลงทะเบียนใบหน้าเองได้" hint="เปิด = พนักงานเพิ่มตัวอย่างใบหน้าในแอป (เมนูข้อมูลของฉัน) ได้ · ปิด = ฝ่ายบุคคลลงทะเบียนให้เท่านั้น"><Toggle checked={v.allow_self_face_enroll} onChange={(x) => set({ allow_self_face_enroll: x })} /></Row>
           <Row label="พนักงานเลือกกะ/ตารางงานเองได้"><Toggle checked={v.allow_self_schedule} onChange={(x) => set({ allow_self_schedule: x })} /></Row>
           <Row label="ไม่สแกนทั้งวัน ถือว่าขาดงาน" hint="ปิด = ถือว่ามาทำงาน (เหมาะกับพนักงานที่ไม่ต้องลงเวลา)"><Toggle checked={v.absent_if_no_scan} onChange={(x) => set({ absent_if_no_scan: x })} /></Row>
-          <Row label="สแกนครั้งเดียวในวัน">
-            <Select value={v.single_scan_policy} onChange={(e) => set({ single_scan_policy: e.target.value })}>
-              <option value="missing">ถือว่าลืมสแกน (ต้องขอเพิ่มเวลา)</option>
-              <option value="absent">ถือว่าขาดงาน</option>
-              <option value="present">ถือว่ามาทำงานเต็มวัน</option>
-            </Select>
-          </Row>
+          <Row label="สแกนครั้งเดียวในวัน" hint="ปัจจุบันถือว่าลืมสแกน พนักงานยื่นใบขอเพิ่มเวลา"><p className="text-sm text-ink-mute">ยังไม่เปิดใช้ในเวอร์ชันนี้</p></Row>
           <Row label="คิด OT อัตโนมัติโดยไม่ต้องขอ" hint="ปิด = นับ OT เฉพาะที่มีใบขอโอทีอนุมัติแล้ว"><Toggle checked={v.auto_ot_without_request} onChange={(x) => set({ auto_ot_without_request: x })} /></Row>
         </Panel>
         <Panel title="อัตราค่าล่วงเวลา (เท่าของค่าจ้างต่อชั่วโมง)">
@@ -181,17 +175,8 @@ function AttendanceTab() {
           </div>
         </Panel>
         <Panel title="การมาสาย">
-          <Row label="วิธีหักเมื่อมาสาย">
-            <Select value={v.late_policy.mode} onChange={(e) => set({ late_policy: { ...v.late_policy, mode: e.target.value } })}>
-              <option value="deduct_minutes">หักตามนาทีที่สายจริง</option>
-              <option value="round_up">ปัดขึ้นเป็นช่วงเวลา</option>
-              <option value="none">ไม่หักเงิน (บันทึกสถิติอย่างเดียว)</option>
-            </Select>
-          </Row>
-          {v.late_policy.mode === "round_up" && (
-            <Row label="ปัดขึ้นทุก ๆ"><Num value={v.late_policy.round_to_minutes ?? 15} suffix="นาที" onChange={(x) => set({ late_policy: { ...v.late_policy, round_to_minutes: x } })} /></Row>
-          )}
-          <Row label="สายได้โดยไม่หักเงิน" hint="จำนวนครั้งต่อเดือน"><Num value={v.late_policy.free_times_per_month} suffix="ครั้ง" min={0} onChange={(x) => set({ late_policy: { ...v.late_policy, free_times_per_month: x } })} /></Row>
+          <p className="text-sm text-ink-soft">หักตามนาทีที่สายจริง (ค่าจ้างต่อนาที × นาทีที่สาย) เมื่อเปิด “หักเงินเมื่อมาสาย” ในแท็บเงินเดือน · ช่วงผ่อนผันตั้งที่กะการทำงาน</p>
+          <Row label="ปัดขึ้นเป็นช่วงเวลา / สายได้โดยไม่หักเงิน" hint="จะเพิ่มในเวอร์ชันถัดไป"><p className="text-sm text-ink-mute">ยังไม่เปิดใช้ในเวอร์ชันนี้</p></Row>
         </Panel>
         <Panel title="เบี้ยขยัน">
           <Row label="จ่ายเบี้ยขยัน"><Toggle checked={v.diligence.enabled} onChange={(x) => set({ diligence: { ...v.diligence, enabled: x } })} /></Row>
@@ -208,13 +193,7 @@ function AttendanceTab() {
                   <Button size="sm" variant="ghost" icon={<Plus className="size-4" />} onClick={() => set({ diligence: { ...v.diligence, steps: [...v.diligence.steps, (v.diligence.steps.at(-1) ?? 400) + 100] } })}>เพิ่มขั้น</Button>
                 </div>
               </Row>
-              <Row label="เริ่มนับใหม่เมื่อ">
-                <div className="flex flex-wrap gap-4">
-                  {([["late", "มาสาย"], ["absent", "ขาดงาน"], ["leave_unpaid", "ลาไม่รับค่าจ้าง"], ["leave_sick", "ลาป่วย"], ["leave_personal", "ลากิจ"]] as const).map(([k, l]) => (
-                    <Checkbox key={k} label={l} checked={v.diligence.reset_on.includes(k)} onChange={(x) => set({ diligence: { ...v.diligence, reset_on: x ? [...v.diligence.reset_on, k] : v.diligence.reset_on.filter((y) => y !== k) } })} />
-                  ))}
-                </div>
-              </Row>
+              <Row label="เริ่มนับใหม่เมื่อ" hint="ปัจจุบันเริ่มนับใหม่เมื่อ มาสาย / ขาดงาน / ลาไม่รับค่าจ้าง"><p className="text-sm text-ink-mute">ยังไม่เปิดใช้ในเวอร์ชันนี้</p></Row>
             </>
           )}
         </Panel>
@@ -296,14 +275,8 @@ function PayrollTab() {
           </div>
         </Panel>
         <Panel title="สลิปเงินเดือน">
-          <Row label="รหัสเปิดไฟล์สลิป PDF">
-            <Select value={v.payslip_password} onChange={(e) => set({ payslip_password: e.target.value })}>
-              <option value="birthdate">วันเกิด (ววดดปปปป พ.ศ.)</option>
-              <option value="national_id_last4">เลขบัตรประชาชน 4 หลักท้าย</option>
-              <option value="none">ไม่ใส่รหัส</option>
-            </Select>
-          </Row>
-          <Row label="แสดงยอดสะสมทั้งปี (YTD) บนสลิป"><Toggle checked={v.payslip_show_ytd ?? true} onChange={(x) => set({ payslip_show_ytd: x })} /></Row>
+          <Row label="รหัสเปิดไฟล์สลิป PDF" hint="สลิปเปิดดูในแอปด้วยบัญชีของพนักงานเอง และพิมพ์ / บันทึก PDF จากเบราว์เซอร์"><p className="text-sm text-ink-mute">ยังไม่เปิดใช้ในเวอร์ชันนี้</p></Row>
+          <Row label="แสดงยอดสะสมทั้งปี (YTD) บนสลิป" hint="มีผลกับสลิปในแอปและสลิปที่พิมพ์"><Toggle checked={v.payslip_show_ytd ?? true} onChange={(x) => set({ payslip_show_ytd: x })} /></Row>
           <Row label="ข้อความท้ายสลิป"><Input value={v.payslip_note ?? ""} onChange={(e) => set({ payslip_note: e.target.value })} placeholder="เช่น เอกสารนี้เป็นความลับเฉพาะบุคคล" /></Row>
         </Panel>
       </fieldset>
@@ -512,10 +485,9 @@ function PdpaTab() {
           <p className="mb-2 text-sm text-ink-soft">ข้อมูลที่เลือกจะแสดงแบบปิดบังเป็นค่าเริ่มต้น ผู้มีสิทธิ์ต้องกด &quot;แสดง&quot; ทุกครั้ง และระบบจะบันทึกลง Back Log (VIEW_SENSITIVE)</p>
           <Row label="เลขบัตรประชาชน" hint="1-XXXX-XXXX5-67-8"><Toggle checked={v.mask_national_id} onChange={(x) => set({ mask_national_id: x })} /></Row>
           <Row label="เลขบัญชีธนาคาร" hint="XXX-X-X1234"><Toggle checked={v.mask_bank_account} onChange={(x) => set({ mask_bank_account: x })} /></Row>
-          <Row label="เงินเดือน"><Toggle checked={v.mask_salary} onChange={(x) => set({ mask_salary: x })} /></Row>
-          <Row label="เบอร์โทรศัพท์ (ในสมุดรายชื่อ)"><Toggle checked={!!v.mask_phone} onChange={(x) => set({ mask_phone: x })} /></Row>
-          <Row label="ที่อยู่"><Toggle checked={!!v.mask_address} onChange={(x) => set({ mask_address: x })} /></Row>
-          <Row label="ระยะเวลาเก็บข้อมูลหลังพ้นสภาพ" hint="ใช้เป็นนโยบายอ้างอิงในการลบข้อมูล"><Num value={v.retention_years ?? 10} suffix="ปี" onChange={(x) => set({ retention_years: x })} /></Row>
+          <Row label="เงินเดือน" hint="มีผลกับแท็บเงินเดือนและบัญชีในประวัติพนักงาน · เลขบัญชีมีผลกับสลิปที่พิมพ์ด้วย"><Toggle checked={v.mask_salary} onChange={(x) => set({ mask_salary: x })} /></Row>
+          <Row label="เบอร์โทรศัพท์ / ที่อยู่" hint="สมุดรายชื่อแสดงเบอร์โทรให้ทุกคนในบริษัท"><p className="text-sm text-ink-mute">ยังไม่เปิดใช้ในเวอร์ชันนี้</p></Row>
+          <Row label="ระยะเวลาเก็บข้อมูลหลังพ้นสภาพ" hint="บันทึกเป็นนโยบายอ้างอิงเท่านั้น ระบบไม่ลบข้อมูลพนักงานอัตโนมัติ"><Num value={v.retention_years ?? 10} suffix="ปี" onChange={(x) => set({ retention_years: x })} /></Row>
         </Panel>
         <Panel title="ข้อความขอความยินยอม (แสดงในใบสมัครงานและหน้าพนักงาน)">
           <Textarea rows={6} value={v.consent_text} onChange={(e) => set({ consent_text: e.target.value })} />

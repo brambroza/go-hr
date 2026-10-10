@@ -3,6 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { Eye, EyeOff, ShieldAlert } from "lucide-react";
 import { supabaseBrowser } from "@/lib/supabase/client";
+import { useSetting } from "@/components/settings/use-setting";
+import { DEFAULT_PDPA, isMasked, type PdpaMasks } from "@/lib/pdpa";
 import { useCan } from "@/components/app/me-context";
 import { Button, Empty, Panel, Spinner, toast } from "@/components/ui";
 import type { FieldDef } from "@/components/crud/form-fields";
@@ -54,6 +56,8 @@ export function PrivateTab({ emp }: TabProps) {
   const [row, setRow] = useState<Record<string, unknown> | null | undefined>(undefined);
   const [shown, setShown] = useState(false);
   const [busy, setBusy] = useState(false);
+  // ตั้งค่า → PDPA: ช่องไหนปิดบังเป็นค่าเริ่มต้น (กด "แสดง" เปิดทุกช่อง และบันทึก VIEW_SENSITIVE)
+  const { value: pdpa } = useSetting<PdpaMasks>("pdpa", DEFAULT_PDPA);
 
   const load = useCallback(async () => {
     const { data, error } = await sb.from("employee_private").select("*").eq("employee_id", emp.id).maybeSingle();
@@ -78,6 +82,7 @@ export function PrivateTab({ emp }: TabProps) {
   if (row === null) return <Panel><Empty icon={<ShieldAlert className="size-8" />} title="ไม่มีสิทธิ์ดูข้อมูลส่วนนี้" description="ข้อมูลเงินเดือนและบัญชีเป็นข้อมูลอ่อนไหวตาม PDPA" /></Panel>;
 
   const mask = (s: string) => (shown ? s : "••••••");
+  const hidden = (f: "national_id" | "bank_account" | "salary") => isMasked(f, pdpa, shown);
   const canEdit = can("employee_private", "edit");
 
   return (
@@ -94,13 +99,13 @@ export function PrivateTab({ emp }: TabProps) {
         row={row}
         canEdit={canEdit}
         display={{
-          salary: (v, r) => <span className="num font-medium">{mask(money(v as number))} <span className="font-normal text-ink-mute">{SALARY_UNIT[String(r.salary_unit)]}</span></span>,
+          salary: (v, r) => <span className="num font-medium">{hidden("salary") ? "••••••" : money(v as number)} <span className="font-normal text-ink-mute">{SALARY_UNIT[String(r.salary_unit)]}</span></span>,
           salary_unit: (v) => SALARY_UNIT[String(v)] ?? "-",
           pay_method: (v) => PAY_METHOD[String(v)] ?? "-",
           bank_code: (v) => (v ? `${v} ${BANKS[String(v)] ?? ""}` : "-"),
-          bank_account: (v) => <span className="num">{v ? (shown ? String(v) : maskAccount(String(v))) : "-"}</span>,
-          national_id: (v) => <span className="num">{v ? (shown ? formatNationalId(String(v)) : maskNationalId(String(v))) : "-"}</span>,
-          tax_id: (v) => <span className="num">{v ? (shown ? String(v) : maskNationalId(String(v))) : "-"}</span>,
+          bank_account: (v) => <span className="num">{v ? (hidden("bank_account") ? maskAccount(String(v)) : String(v)) : "-"}</span>,
+          national_id: (v) => <span className="num">{v ? (hidden("national_id") ? maskNationalId(String(v)) : formatNationalId(String(v))) : "-"}</span>,
+          tax_id: (v) => <span className="num">{v ? (hidden("national_id") ? maskNationalId(String(v)) : String(v)) : "-"}</span>,
           passport_no: (v) => (v ? mask(String(v)) : "-"),
           tax_method: (v) => TAX_METHOD[String(v)] ?? "-",
           prev_employer_income: (v) => <span className="num">{mask(money(v as number))}</span>,

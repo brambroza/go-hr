@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { computeEntry, type PayItemDef, type EmployeePayInput } from "../lib/payroll/engine";
+import { computeEntry, roundMoney, type PayItemDef, type EmployeePayInput } from "../lib/payroll/engine";
 
 let id = 1;
 const mk = (code: string, system_key: string | null, direction: 1 | -1, o: Partial<PayItemDef> = {}): PayItemDef =>
@@ -84,4 +84,25 @@ test("second period in same month does not double SSO", () => {
       include_salary: true, include_attendance: true, include_constants: true, include_tax: true, include_sso: true, include_pvd: true },
     monthPrev: { regular: 15000, irregular: 0, tax: 100, sso_wage: 15000, sso_employee: 750, sso_employer: 750 } }));
   assert.equal(r.sso_employee, 125);
+});
+
+test("round_mode baht: every line and the net pay are whole baht", () => {
+  const r = computeEntry(base({
+    priv: { salary: 30001, salary_unit: "month", sso_enabled: true, pvd_enabled: false, pvd_employee_rate: 0, pvd_employer_rate: 0, tax_method: "annualized", tax_fixed_rate: null },
+    att: { work_days: 20, paid_holiday_days: 0, paid_leave_days: 0, unpaid_leave_days: 0, absent_days: 0, late_minutes: 7, early_minutes: 0, work_minutes: 0, ot_minutes: {}, late_count: 1 },
+    cfg: { round_mode: "baht" },
+  }));
+  for (const l of r.lines) assert.equal(l.amount, Math.round(l.amount), `${l.code} = ${l.amount}`);
+  assert.equal(r.net_pay, Math.round(r.net_pay));
+  const satang = computeEntry(base({
+    priv: { salary: 30001, salary_unit: "month", sso_enabled: true, pvd_enabled: false, pvd_employee_rate: 0, pvd_employer_rate: 0, tax_method: "annualized", tax_fixed_rate: null },
+    att: { work_days: 20, paid_holiday_days: 0, paid_leave_days: 0, unpaid_leave_days: 0, absent_days: 0, late_minutes: 7, early_minutes: 0, work_minutes: 0, ot_minutes: {}, late_count: 1 },
+  }));
+  assert.notEqual(satang.lines.find((l) => l.code === "LATE")?.amount, Math.round(satang.lines.find((l) => l.code === "LATE")?.amount ?? 0), "satang keeps 2 decimals");
+});
+
+test("roundMoney: satang keeps 2 decimals, baht rounds half up", () => {
+  assert.equal(roundMoney(12.345, "satang"), 12.35);
+  assert.equal(roundMoney(12.5, "baht"), 13);
+  assert.equal(roundMoney(12.49, undefined), 12.49);
 });

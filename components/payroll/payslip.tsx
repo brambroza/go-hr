@@ -1,6 +1,9 @@
 // Printable Thai payslip (server or client component — no hooks). Used by /payroll/[id]/payslips and /m/payslips/[entryId].
 import { bahtText, maskAccount, money, thDate } from "@/lib/format";
 import { BANK_NAMES } from "@/lib/payroll/files";
+import { DEFAULT_PAYSLIP_OPTIONS, type PayslipOptions } from "@/lib/payroll/payslip-options";
+
+export type { PayslipOptions } from "@/lib/payroll/payslip-options";
 
 export interface PayslipCompany {
   name: string;
@@ -24,7 +27,7 @@ export interface PayslipData {
 
 const UNIT: Record<string, string> = { month: "เดือน", day: "วัน", hour: "ชั่วโมง" };
 
-export function Payslip({ company, data, compact }: { company: PayslipCompany; data: PayslipData; compact?: boolean }) {
+export function Payslip({ company, data, compact, options = DEFAULT_PAYSLIP_OPTIONS }: { company: PayslipCompany; data: PayslipData; compact?: boolean; options?: PayslipOptions }) {
   const { period, entry, items } = data;
   const inc = items.filter((i) => i.direction === 1);
   const ded = items.filter((i) => i.direction === -1);
@@ -62,7 +65,7 @@ export function Payslip({ company, data, compact }: { company: PayslipCompany; d
         <KV k="หน่วยงาน" v={entry.org_name ?? "-"} />
         <KV
           k="การจ่าย"
-          v={entry.pay_method === "bank" ? `${(BANK_NAMES[entry.bank_code ?? ""] ?? "").replace(/^ธนาคาร/, "").replace(/ \(.*\)$/, "") || entry.bank_code || ""} ${maskAccount(entry.bank_account)}` : entry.pay_method === "cheque" ? "เช็ค" : "เงินสด"}
+          v={entry.pay_method === "bank" ? `${(BANK_NAMES[entry.bank_code ?? ""] ?? "").replace(/^ธนาคาร/, "").replace(/ \(.*\)$/, "") || entry.bank_code || ""} ${options.maskBankAccount ? maskAccount(entry.bank_account) : entry.bank_account ?? ""}` : entry.pay_method === "cheque" ? "เช็ค" : "เงินสด"}
         />
         <KV k="งวด" v={period.name} />
         <KV k="รอบเงินเดือน" v={`${thDate(period.start_date)} – ${thDate(period.end_date)}`} />
@@ -112,13 +115,16 @@ export function Payslip({ company, data, compact }: { company: PayslipCompany; d
         </div>
       </section>
 
-      <section className="grid grid-cols-2 gap-x-4 pt-1 text-[10.5px] sm:grid-cols-4 print:grid-cols-4">
-        <KV k="เงินได้สะสม" v={money(entry.ytd_income)} />
-        <KV k="ภาษีสะสม" v={money(entry.ytd_tax)} />
-        <KV k="ประกันสังคมสะสม" v={money(entry.ytd_sso)} />
-        <KV k="กองทุนสำรองฯ สะสม" v={money(entry.ytd_pvd)} />
-        {!!Number(entry.pvd_employer) && <KV k="PVD ส่วนนายจ้างงวดนี้" v={money(entry.pvd_employer)} />}
-      </section>
+      {options.showYtd && (
+        <section className="grid grid-cols-2 gap-x-4 pt-1 text-[10.5px] sm:grid-cols-4 print:grid-cols-4">
+          <KV k="เงินได้สะสม" v={money(entry.ytd_income)} />
+          <KV k="ภาษีสะสม" v={money(entry.ytd_tax)} />
+          <KV k="ประกันสังคมสะสม" v={money(entry.ytd_sso)} />
+          <KV k="กองทุนสำรองฯ สะสม" v={money(entry.ytd_pvd)} />
+          {!!Number(entry.pvd_employer) && <KV k="PVD ส่วนนายจ้างงวดนี้" v={money(entry.pvd_employer)} />}
+        </section>
+      )}
+      {options.note && <p className="mt-1 whitespace-pre-wrap text-[10px] text-neutral-700">{options.note}</p>}
       <footer className="mt-1 flex justify-between text-[10px] text-neutral-600">
         <span>เอกสารนี้ออกโดยระบบคอมพิวเตอร์ ไม่ต้องลงลายมือชื่อ</span>
         {period.code && <span>{period.code}</span>}

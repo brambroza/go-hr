@@ -2,6 +2,7 @@ import "server-only";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { fetchRows, fetchRowsIn } from "./fetch";
 import type { PayslipCompany, PayslipData } from "@/components/payroll/payslip";
+import { payslipOptions, type PayslipOptions } from "./payslip-options";
 
 const COLS =
   "id, period_id, employee_id, emp_code, emp_name, position_name, org_unit_id, bank_code, bank_account, pay_method, base_salary, salary_unit, work_days, paid_days, absent_days, late_minutes, total_income, total_deduction, net_pay, ytd_income, ytd_tax, ytd_sso, ytd_pvd, sso_employer, pvd_employer";
@@ -42,4 +43,11 @@ export async function loadCompany(sb: SupabaseClient): Promise<PayslipCompany> {
   const { data } = await sb.from("settings").select("value").eq("key", "company").maybeSingle();
   const v = (data?.value ?? {}) as PayslipCompany;
   return { ...v, name: v.name || "บริษัท" };
+}
+
+/** Payslip display options: settings.payroll (payslip_show_ytd, payslip_note) + settings.pdpa (mask_bank_account) */
+export async function loadPayslipOptions(sb: SupabaseClient): Promise<PayslipOptions> {
+  const { data } = await sb.from("settings").select("key, value").in("key", ["payroll", "pdpa"]);
+  const by = new Map(((data ?? []) as { key: string; value: Record<string, unknown> }[]).map((r) => [r.key, r.value]));
+  return payslipOptions(by.get("payroll"), by.get("pdpa"));
 }

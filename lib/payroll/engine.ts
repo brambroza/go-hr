@@ -23,6 +23,8 @@ export interface PayrollConfig {
   deduct_late: boolean;
   deduct_early: boolean;
   prorate_new_joiner: boolean;
+  /** settings.payroll.round_mode — satang = 2 decimals (default), baht = whole baht per line and total */
+  round_mode: "satang" | "baht";
 }
 
 export const DEFAULT_PAYROLL_CONFIG: PayrollConfig = {
@@ -32,6 +34,7 @@ export const DEFAULT_PAYROLL_CONFIG: PayrollConfig = {
   deduct_late: true,
   deduct_early: true,
   prorate_new_joiner: true,
+  round_mode: "satang",
 };
 
 export interface PeriodInput {
@@ -143,6 +146,11 @@ export interface EntryResult {
 
 const r2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 
+/** Round a money amount per settings.payroll.round_mode ("baht" = whole baht, anything else = satang) */
+export function roundMoney(n: number, mode: PayrollConfig["round_mode"] | string | undefined): number {
+  return mode === "baht" ? Math.round(n + Number.EPSILON) : r2(n);
+}
+
 const OT_KEYS: Record<string, string> = { "1": "ot_1", "1.5": "ot_1_5", "2": "ot_2", "3": "ot_3" };
 
 function daysBetween(a: string, b: string): number {
@@ -157,9 +165,10 @@ export function computeEntry(input: EmployeePayInput): EntryResult {
   const lines: EntryLine[] = [];
   const warnings: string[] = [];
 
+  const rm = (n: number) => roundMoney(n, cfg.round_mode);
   const push = (it: PayItemDef | undefined, amount: number, opts: Partial<EntryLine> = {}) => {
     if (!it) return;
-    const a = r2(amount);
+    const a = rm(amount);
     if (!a) return;
     lines.push({
       pay_item_id: it.id,
@@ -276,7 +285,7 @@ export function computeEntry(input: EmployeePayInput): EntryResult {
     ssoWage = c.wage - Math.min(input.monthPrev.sso_wage, c.wage);
     ssoEmp = Math.max(0, c.employee - input.monthPrev.sso_employee);
     ssoEr = Math.max(0, c.employer - input.monthPrev.sso_employer);
-    if (ssoEmp) lines.push(mkSys(items.sso, ssoEmp, "ประกันสังคม"));
+    if (ssoEmp) lines.push(mkSys(items.sso, ssoEmp, "ประกันสังคม", cfg.round_mode));
   }
 
   let pvdEmp = 0;
@@ -284,7 +293,7 @@ export function computeEntry(input: EmployeePayInput): EntryResult {
   if (period.include_pvd && priv.pvd_enabled) {
     pvdEmp = r2((pvdBase * (Number(priv.pvd_employee_rate) || 0)) / 100);
     pvdEr = r2((pvdBase * (Number(priv.pvd_employer_rate) || 0)) / 100);
-    if (pvdEmp) lines.push(mkSys(items.pvd, pvdEmp, "กองทุนสำรองเลี้ยงชีพ"));
+    if (pvdEmp) lines.push(mkSys(items.pvd, pvdEmp, "กองทุนสำรองเลี้ยงชีพ", cfg.round_mode));
   }
 
   // ---- tax ---------------------------------------------------------------------------
@@ -318,7 +327,7 @@ export function computeEntry(input: EmployeePayInput): EntryResult {
       tax = Math.max(0, r2(w.tax - input.monthPrev.tax));
       taxDetail = { projected_income: w.projectedIncome, annual_tax: w.annualTaxWithCurrentIrregular, allowances: w.detail.allowances, net_income: w.detail.netIncome };
     }
-    if (tax) lines.push(mkSys(items.tax, tax, "ภาษีเงินได้หัก ณ ที่จ่าย"));
+    if (tax) lines.push(mkSys(items.tax, tax, "ภาษีเงินได้หัก ณ ที่จ่าย", cfg.round_mode));
   }
 
   // ---- after-tax deductions (loans, advances, guarantee) ---------------------------------
@@ -326,9 +335,9 @@ export function computeEntry(input: EmployeePayInput): EntryResult {
   input.advances.forEach((l) => push(l.item, l.amount, { source: "advance", source_id: l.source_id ?? null }));
   if (input.guarantee) push(input.guarantee.item, input.guarantee.amount, { source: "guarantee", source_id: input.guarantee.source_id ?? null });
 
-  const totalIncome = r2(lines.filter((l) => l.direction === 1).reduce((s, l) => s + l.amount, 0));
-  const totalDeduction = r2(lines.filter((l) => l.direction === -1).reduce((s, l) => s + l.amount, 0));
-  const net = r2(totalIncome - totalDeduction);
+  const totalIncome = rm(lines.filter((l) => l.direction === 1).reduce((s, l) => s + l.amount, 0));
+  const totalDeduction = rm(lines.filter((l) => l.direction === -1).reduce((s, l) => s + l.amount, 0));
+  const net = rm(totalIncome - totalDeduction);
   if (net < 0) warnings.push("เงินได้สุทธิติดลบ — ตรวจสอบรายการหัก");
   void totalIncomeGross;
 
@@ -355,7 +364,7 @@ export function computeEntry(input: EmployeePayInput): EntryResult {
   };
 }
 
-function mkSys(it: PayItemDef | undefined, amount: number, fallback: string): EntryLine {
+function mkSys(it: PayItemDef | undefined, amount: number, fallback: string, mode: PayrollConfig["round_mode"] = "satang"): EntryLine {
   return {
     pay_item_id: it?.id ?? null,
     code: it?.code ?? fallback,
@@ -364,7 +373,7 @@ function mkSys(it: PayItemDef | undefined, amount: number, fallback: string): En
     direction: -1,
     qty: null,
     rate: null,
-    amount: r2(amount),
+    amount: roundMoney(amount, mode),
     is_taxable: false,
     is_sso: false,
     is_regular: true,
