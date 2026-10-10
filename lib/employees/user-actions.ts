@@ -159,7 +159,8 @@ export async function setActiveAction(userId: string, active: boolean): Promise<
     const me = await requirePerm("security", "edit");
     if (userId === me.userId && !active) throw new Error("ไม่สามารถปิดการใช้งานบัญชีของตัวเองได้");
     const sb = supabaseAdmin();
-    const { error } = await sb.from("profiles").update({ is_active: active }).eq("id", userId);
+    // a manual change wins over the automatic resign lock (locked_by_resign = false), and auth_banned_at keeps the daily job in step
+    const { error } = await sb.from("profiles").update({ is_active: active, locked_by_resign: false, auth_banned_at: active ? null : new Date().toISOString() }).eq("id", userId);
     if (error) throw new Error(error.message);
     // block sign-in at the auth layer too (ban ~100 years) and revoke sessions
     await sb.auth.admin.updateUserById(userId, { ban_duration: active ? "none" : "876000h" });
