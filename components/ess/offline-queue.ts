@@ -1,21 +1,14 @@
 "use client";
 // Offline check-in queue (localStorage). Each item is synced later with check_in(p_method:'offline', p_log_time, p_client_ref).
 // client_ref makes the sync idempotent (time_logs.client_ref is unique), so retrying is always safe.
+// Items are stamped with the employee they belong to; only the signed-in employee's items are shown and synced
+// (a phone can be shared), and the whole queue is dropped on sign-out (see ./logout.ts).
 
 import { supabaseBrowser } from "@/lib/supabase/client";
 import { errText, isNetworkError, uuid } from "./lib";
+import { markQueueError, normalizeQueue, partitionQueue, type QueuedCheckin } from "./offline-queue-core";
 
-export interface QueuedCheckin {
-  client_ref: string;
-  log_time: string; // ISO
-  latitude: number | null;
-  longitude: number | null;
-  accuracy: number | null;
-  direction: string;
-  employee_id: number | null;
-  error?: string | null; // last business error (e.g. outside area) — kept so the user can see why it failed
-  tries?: number;
-}
+export type { QueuedCheckin } from "./offline-queue-core";
 
 const KEY = "gohr.ess.offline-checkins";
 const EVENT = "gohr:offline-queue";
@@ -23,8 +16,7 @@ const EVENT = "gohr:offline-queue";
 function read(): QueuedCheckin[] {
   try {
     const raw = localStorage.getItem(KEY);
-    const v = raw ? JSON.parse(raw) : [];
-    return Array.isArray(v) ? v : [];
+    return normalizeQueue(raw ? JSON.parse(raw) : []);
   } catch {
     return [];
   }
@@ -39,19 +31,25 @@ function write(list: QueuedCheckin[]) {
   if (typeof window !== "undefined") window.dispatchEvent(new Event(EVENT));
 }
 
-export function queuedCheckins(employeeId?: number | null): QueuedCheckin[] {
-  const all = read();
-  return employeeId == null ? all : all.filter((q) => q.employee_id == null || q.employee_id === employeeId);
+/** Queued items of one employee only (never another person's punches on a shared phone) */
+export function queuedCheckins(employeeId: number | null | undefined): QueuedCheckin[] {
+  return partitionQueue(read(), employeeId).mine;
 }
 
-export function enqueueCheckin(item: Omit<QueuedCheckin, "client_ref" | "log_time"> & { log_time?: string }): QueuedCheckin {
-  const q: QueuedCheckin = { client_ref: uuid(), log_time: item.log_time ?? new Date().toISOString(), ...item, error: null, tries: 0 };
+export function enqueueCheckin(item: Omit<QueuedCheckin, "client_ref" | "log_time" | "employee_id"> & { log_time?: string; employee_id: number | null | undefined }): QueuedCheckin {
+  if (item.employee_id == null) throw new Error("บัญชีนี้ยังไม่ผูกกับพนักงาน จึงบันทึกเวลาไว้ไม่ได้");
+  const q: QueuedCheckin = { client_ref: uuid(), log_time: item.log_time ?? new Date().toISOString(), ...item, employee_id: Number(item.employee_id), error: null, tries: 0 };
   write([...read(), q]);
   return q;
 }
 
 export function removeQueued(ref: string) {
   write(read().filter((q) => q.client_ref !== ref));
+}
+
+/** Drop everything (sign-out): items of other people can never be synced by anyone else on this device */
+export function clearQueue() {
+  write([]);
 }
 
 export function onQueueChange(fn: () => void): () => void {
@@ -63,17 +61,20 @@ export function onQueueChange(fn: () => void): () => void {
   };
 }
 
-let syncing: Promise<{ synced: number; failed: number }> | null = null;
+const syncing = new Map<number, Promise<{ synced: number; failed: number }>>();
 
-/** Send every queued check-in. Network errors keep the item; business errors are recorded on the item. */
-export function syncQueue(): Promise<{ synced: number; failed: number }> {
-  if (syncing) return syncing;
-  syncing = (async () => {
+/** Send the signed-in employee's queued check-ins. Network errors keep the item; business errors are recorded on the item. */
+export function syncQueue(employeeId: number | null | undefined): Promise<{ synced: number; failed: number }> {
+  if (employeeId == null) return Promise.resolve({ synced: 0, failed: 0 });
+  const key = Number(employeeId);
+  const running = syncing.get(key);
+  if (running) return running;
+  const p = (async () => {
     let synced = 0;
     let failed = 0;
     if (typeof navigator !== "undefined" && !navigator.onLine) return { synced, failed };
     const sb = supabaseBrowser();
-    for (const q of read()) {
+    for (const q of queuedCheckins(key)) {
       const { error } = await sb.rpc("check_in", {
         p_method: "offline",
         p_latitude: q.latitude,
@@ -92,12 +93,13 @@ export function syncQueue(): Promise<{ synced: number; failed: number }> {
         break; // still offline — try again later
       } else {
         failed++;
-        write(read().map((x) => (x.client_ref === q.client_ref ? { ...x, error: errText(error), tries: (x.tries ?? 0) + 1 } : x)));
+        write(markQueueError(read(), q.client_ref, errText(error)));
       }
     }
     return { synced, failed };
   })().finally(() => {
-    syncing = null;
+    syncing.delete(key);
   });
-  return syncing;
+  syncing.set(key, p);
+  return p;
 }

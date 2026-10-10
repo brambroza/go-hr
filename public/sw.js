@@ -1,13 +1,16 @@
 /* GO HR service worker — app shell cache + offline fallback for the employee app (/m).
  * - Static assets (/_next/static, fonts, icons): cache-first (they are content-hashed).
- * - Pages (navigations): network-first, cached copy when offline, else /m/offline.
+ * - Pages (navigations): network-first, cached copy when offline, else /m/offline. Personal pages (payslips, profile ...) are never cached.
  * - Never cache API traffic: /rest/v1, /auth/v1, /storage/v1, /api/*, server actions / RSC requests.
  */
-const VERSION = "gohr-v2";
+const VERSION = "gohr-v3";
 const SHELL = `${VERSION}-shell`;
 const PAGES = `${VERSION}-pages`;
 const OFFLINE_URL = "/m/offline";
 const PRECACHE = [OFFLINE_URL, "/m", "/m/checkin", "/manifest.webmanifest", "/icon.svg", "/icons/icon-192.png", "/icons/icon-512.png"];
+// Pages with personal / salary data are never stored for offline use (keep in step with lib/pwa.ts NO_CACHE_PATTERNS)
+const NO_CACHE = [/^\/m\/payslips(\/|$)/, /^\/m\/profile(\/|$)/, /^\/m\/evaluations(\/|$)/, /^\/m\/approvals(\/|$)/, /^\/m\/team(\/|$)/, /^\/m\/requests\/\d+/];
+const cacheable = (pathname) => pathname.startsWith("/m") && !NO_CACHE.some((r) => r.test(pathname));
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
@@ -63,7 +66,7 @@ self.addEventListener("fetch", (event) => {
     event.respondWith(
       fetch(req)
         .then((res) => {
-          if (res.ok && url.pathname.startsWith("/m") && !res.redirected) {
+          if (res.ok && cacheable(url.pathname) && !res.redirected) {
             const copy = res.clone();
             caches.open(PAGES).then((c) => c.put(req, copy));
           }
@@ -76,4 +79,8 @@ self.addEventListener("fetch", (event) => {
 
 self.addEventListener("message", (event) => {
   if (event.data === "skipWaiting") self.skipWaiting();
+  // sign-out: forget every cached page so the next person on this device cannot open them offline
+  if (event.data && event.data.type === "clearPages") {
+    event.waitUntil(caches.delete(PAGES).then(() => event.ports && event.ports[0] && event.ports[0].postMessage("ok")));
+  }
 });

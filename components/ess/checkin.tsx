@@ -187,8 +187,12 @@ export function CheckinScreen() {
       setResult({ ok: false, message: `${reason} และยังหาตำแหน่ง GPS ไม่ได้ จึงบันทึกไว้ไม่ได้ — รอให้ GPS จับตำแหน่งได้แล้วกดอีกครั้ง` });
       return;
     }
-    const q = enqueueCheckin({ latitude: geo.fix.lat, longitude: geo.fix.lng, accuracy: geo.fix.acc, direction, employee_id: me.employeeId });
-    setResult({ ok: true, time: q.log_time, location: anywhere ? null : nearest?.loc.name ?? null, distance: !anywhere && nearest ? Math.round(nearest.dist) : null, offline: true });
+    try {
+      const q = enqueueCheckin({ latitude: geo.fix.lat, longitude: geo.fix.lng, accuracy: geo.fix.acc, direction, employee_id: me.employeeId });
+      setResult({ ok: true, time: q.log_time, location: anywhere ? null : nearest?.loc.name ?? null, distance: !anywhere && nearest ? Math.round(nearest.dist) : null, offline: true });
+    } catch (e) {
+      setResult({ ok: false, message: (e as Error).message });
+    }
   }
 
   async function submit(opts: { qrToken?: string } = {}) {
@@ -629,7 +633,7 @@ export function CheckinScreen() {
                 loading={syncing}
                 onClick={async () => {
                   setSyncing(true);
-                  const r = await syncQueue().finally(() => setSyncing(false));
+                  const r = await syncQueue(me.employeeId).finally(() => setSyncing(false));
                   if (r.synced) toast.ok(`ซิงก์แล้ว ${r.synced} รายการ`);
                   else if (r.failed) toast.error("ยังซิงก์ไม่ได้ ดูเหตุผลในรายการ");
                   else toast.info("ไม่มีรายการที่ต้องซิงก์");

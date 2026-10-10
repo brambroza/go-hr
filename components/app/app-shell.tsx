@@ -12,8 +12,10 @@ import { NAV, type NavItem } from "@/lib/nav";
 import { can, type Me } from "@/lib/permissions";
 import { MeProvider } from "./me-context";
 import { supabaseBrowser } from "@/lib/supabase/client";
-import { runAction } from "@/components/ui";
+import { runAction, useConfirm } from "@/components/ui";
+import { signOutEverywhere } from "@/components/ess/logout";
 import { thDateTime } from "@/lib/format";
+import { appLink } from "@/lib/notify-links";
 
 const ICONS: Record<string, typeof Bell> = { LayoutDashboard, Network, Users, Clock, FileCheck2, Wallet, FileBarChart, UserPlus, GraduationCap, Target, Megaphone, Settings, LifeBuoy };
 
@@ -179,6 +181,7 @@ function EmployeeSearch() {
 type Noti = { id: number; title: string; body: string | null; link: string | null; read_at: string | null; created_at: string };
 
 export function Notifications() {
+  const pathname = usePathname();
   const [items, setItems] = useState<Noti[]>([]);
   const [open, setOpen] = useState(false);
   const router = useRouter();
@@ -225,7 +228,8 @@ export function Notifications() {
                     onClick={async () => {
                       setOpen(false);
                       if (!n.read_at) await supabaseBrowser().from("notifications").update({ read_at: new Date().toISOString() }).eq("id", n.id);
-                      if (n.link) router.push(n.link);
+                      const to = appLink(n.link, pathname.startsWith("/m"));
+                      if (to) router.push(to);
                       load();
                     }}
                   >
@@ -246,9 +250,11 @@ export function Notifications() {
 function UserMenu({ me }: { me: Me }) {
   const [open, setOpen] = useState(false);
   const router = useRouter();
+  const { confirm, dialog } = useConfirm();
   const initials = (me.employee?.nickname || me.displayName).slice(0, 2);
   return (
     <div className="relative">
+      {dialog}
       <button className="flex items-center gap-2 rounded-lg px-1.5 py-1 hover:bg-paper" onClick={() => setOpen((v) => !v)}>
         {me.employee?.photo_url ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -279,7 +285,7 @@ function UserMenu({ me }: { me: Me }) {
             <button
               className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm text-rust hover:bg-rust-soft"
               onClick={async () => {
-                await supabaseBrowser().auth.signOut();
+                if (!(await signOutEverywhere({ employeeId: me.employeeId, confirm }))) return;
                 router.replace("/login");
                 router.refresh();
               }}

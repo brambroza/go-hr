@@ -5,6 +5,8 @@ import { loadNotifyConfig, appUrl } from "@/lib/notify/config";
 import { linePush, notificationText } from "@/lib/notify/line";
 import { sendEmail } from "@/lib/notify/email";
 import { isDue, nextRun } from "./cron";
+import { BAN_FOREVER, planAuthBans, type ProfileAccessRow } from "./access";
+import { appLink } from "@/lib/notify-links";
 import { runAutomationRules, remindBucket } from "./automation";
 import { admin, bkkDate, claim, daysBetween, getSettingAdmin, hrUsers, must, notifyUsers, plusDays, systemAuthor, thShort, usersOfEmployees, type Admin } from "./util";
 
@@ -38,7 +40,11 @@ const JOBS: Record<JobCode, (c: Ctx) => Promise<string>> = {
   async apply_movements({ sb, today }) {
     const { data, error } = await sb.rpc("apply_movements", { p_until: today });
     if (error) throw new Error(error.message);
-    return `นำรายการโอนย้าย/ปรับเงินเดือนไปใช้ ${data ?? 0} รายการ`;
+    // accounts of people who left (lock the day after the last working day) / came back
+    const { data: locked, error: lockErr } = await sb.rpc("sync_resigned_access");
+    if (lockErr) throw new Error(lockErr.message);
+    const bans = await syncAuthBans(sb);
+    return `นำรายการโอนย้าย/ปรับเงินเดือนไปใช้ ${data ?? 0} รายการ, ปิด/เปิดบัญชีพนักงานพ้นสภาพ ${locked ?? 0} บัญชี, ban/unban ผู้ใช้ ${bans.banned}/${bans.unbanned}${bans.errors ? ` (ผิดพลาด ${bans.errors})` : ""}`;
   },
 
   async probation_remind({ sb, today }) {
@@ -206,7 +212,7 @@ const JOBS: Record<JobCode, (c: Ctx) => Promise<string>> = {
       if (!n.sent_line) {
         if (lineOn && p?.line_user_id) {
           try {
-            await linePush(cfg.line.channel_access_token!, p.line_user_id, [{ type: "text", text: notificationText(n, base) }]);
+            await linePush(cfg.line.channel_access_token!, p.line_user_id, [{ type: "text", text: notificationText({ ...n, link: appLink(n.link, true) }, base) }]);
             line++;
           } catch (e) {
             errors++;
@@ -240,6 +246,27 @@ const JOBS: Record<JobCode, (c: Ctx) => Promise<string>> = {
 export interface JobResult { code: string; status: "ok" | "error" | "skipped"; message: string; ms: number }
 
 /** Run one job now and record the result (last_run_at / status / message, automation_logs). */
+
+/** Ban / unban Supabase auth users so sign-in matches profiles.is_active (profiles.auth_banned_at records it) */
+export async function syncAuthBans(sb: Admin): Promise<{ banned: number; unbanned: number; errors: number }> {
+  const rows = (must(await sb.from("profiles").select("id, is_active, auth_banned_at").or("and(is_active.eq.false,auth_banned_at.is.null),and(is_active.eq.true,auth_banned_at.not.is.null)")) ?? []) as ProfileAccessRow[];
+  const plan = planAuthBans(rows);
+  let banned = 0, unbanned = 0, errors = 0;
+  for (const id of plan.ban) {
+    const { error } = await sb.auth.admin.updateUserById(id, { ban_duration: BAN_FOREVER });
+    if (error) { errors++; continue; }
+    must(await sb.from("profiles").update({ auth_banned_at: new Date().toISOString() }).eq("id", id).select("id"));
+    banned++;
+  }
+  for (const id of plan.unban) {
+    const { error } = await sb.auth.admin.updateUserById(id, { ban_duration: "none" });
+    if (error) { errors++; continue; }
+    must(await sb.from("profiles").update({ auth_banned_at: null }).eq("id", id).select("id"));
+    unbanned++;
+  }
+  return { banned, unbanned, errors };
+}
+
 export async function runJob(code: string, opts: { now?: Date; trigger?: "cron" | "manual" } = {}): Promise<JobResult> {
   const sb = admin();
   const now = opts.now ?? new Date();

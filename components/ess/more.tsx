@@ -7,11 +7,14 @@ import { BookOpen, CalendarDays, CheckCheck, ClipboardCheck, KeyRound, ListTodo,
 import { useMe } from "@/components/app/me-context";
 import { isBackOffice } from "@/lib/permissions";
 import { supabaseBrowser } from "@/lib/supabase/client";
+import { useConfirm } from "@/components/ui";
+import { signOutEverywhere } from "./logout";
 
 type Item = { href: string; label: string; icon: typeof Plane; badge?: number };
 
 export function MoreMenu() {
   const me = useMe();
+  const { confirm, dialog } = useConfirm();
   const router = useRouter();
   const [toApprove, setToApprove] = useState(0);
   useEffect(() => {
@@ -94,13 +97,14 @@ export function MoreMenu() {
       <button
         className="mb-4 flex h-14 w-full items-center justify-center gap-2 rounded-[var(--radius-panel)] border border-line bg-white text-[15px] font-medium text-rust active:bg-rust-soft"
         onClick={async () => {
-          await supabaseBrowser().auth.signOut();
+          if (!(await signOutEverywhere({ employeeId: me.employeeId, confirm }))) return;
           router.replace("/login");
           router.refresh();
         }}
       >
         <LogOut className="size-5" /> ออกจากระบบ
       </button>
+      {dialog}
     </>
   );
 }

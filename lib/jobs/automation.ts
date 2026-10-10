@@ -158,23 +158,20 @@ async function runActions(sb: Admin, rule: Rule, hit: Hit, emps: Map<number, Emp
   let done = 0;
   for (const a of rule.actions ?? []) {
     if (a.type === "notify") {
+      // the employee gets a link into their own app; supervisors / HR get the employee record
       const users: (string | null)[] = [];
+      let selfUser: string | null = null;
       for (const to of a.to ?? []) {
-        if (to === "employee") users.push(await userOf(e?.id));
+        if (to === "employee") selfUser = await userOf(e?.id);
         else if (to === "supervisor") users.push(await userOf(e?.supervisor_id));
         else if (to === "hr") users.push(...(await hrUsers(sb)).map((u) => u.id));
         else if (to.startsWith("role:")) users.push(...(await hrUsers(sb, to.slice(5))).map((u) => u.id));
         else if (to.startsWith("user:")) users.push(to.slice(5));
       }
       const ch = a.channels?.length ? a.channels : ["app"];
-      done += await notifyUsers(sb, users, {
-        title: fillTemplate(a.title || rule.name, hit.ctx),
-        body: fillTemplate(a.body, hit.ctx) || null,
-        link: e ? `/employees/${e.id}` : null,
-        category: "automation",
-        line: ch.includes("line"),
-        email: ch.includes("email"),
-      });
+      const base = { title: fillTemplate(a.title || rule.name, hit.ctx), body: fillTemplate(a.body, hit.ctx) || null, category: "automation", line: ch.includes("line"), email: ch.includes("email") };
+      done += await notifyUsers(sb, users.filter((u) => u !== selfUser), { ...base, link: e ? `/employees/${e.id}` : null });
+      if (selfUser) done += await notifyUsers(sb, [selfUser], { ...base, link: rule.trigger === "missing_scan" ? "/m/requests/new?type=time_add" : "/m" });
     } else if (a.type === "todo") {
       let assignee: number | null = null;
       if (a.assign_to === "employee") assignee = e?.id ?? null;

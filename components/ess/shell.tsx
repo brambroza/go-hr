@@ -7,6 +7,7 @@ import { FileText, Fingerprint, Home, LayoutGrid, Monitor, Receipt, WifiOff } fr
 import { clsx, toast } from "@/components/ui";
 import { Notifications } from "@/components/app/app-shell";
 import { onQueueChange, queuedCheckins, syncQueue } from "./offline-queue";
+import { useMe } from "@/components/app/me-context";
 
 const TABS = [
   { href: "/m", label: "หน้าแรก", icon: Home, exact: true },
@@ -20,6 +21,8 @@ const MORE_PATHS = ["/m/more", "/m/leave", "/m/calendar", "/m/approvals", "/m/te
 
 export function EssShell({ company, backOffice, children }: { company: { name: string; logo_url: string | null }; backOffice: boolean; children: ReactNode }) {
   const pathname = usePathname();
+  const me = useMe();
+  const employeeId = me.employeeId;
   const [online, setOnline] = useState(true);
   const [queued, setQueued] = useState(0);
 
@@ -29,12 +32,12 @@ export function EssShell({ company, backOffice, children }: { company: { name: s
     if ("serviceWorker" in navigator && (process.env.NODE_ENV === "production" || location.search.includes("sw=1"))) {
       navigator.serviceWorker.register("/sw.js", { scope: "/" }).catch(() => {});
     }
-    const refresh = () => setQueued(queuedCheckins().length);
+    const refresh = () => setQueued(queuedCheckins(employeeId).length);
     refresh();
     const off = onQueueChange(refresh);
     const doSync = async () => {
-      if (!queuedCheckins().length) return;
-      const r = await syncQueue();
+      if (!queuedCheckins(employeeId).length) return;
+      const r = await syncQueue(employeeId);
       if (r.synced) toast.ok(`ซิงก์การลงเวลาที่ค้างไว้แล้ว ${r.synced} รายการ`);
     };
     const on = () => {
@@ -53,7 +56,7 @@ export function EssShell({ company, backOffice, children }: { company: { name: s
       window.removeEventListener("offline", offl);
       clearInterval(t);
     };
-  }, []);
+  }, [employeeId]);
 
   const isActive = (t: (typeof TABS)[number]) => {
     if (t.exact) return pathname === t.href;
