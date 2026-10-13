@@ -6,6 +6,8 @@ export interface ProfileAccessRow {
   id: string;
   is_active: boolean;
   auth_banned_at: string | null;
+  /** administrator accounts are never banned by the job (only by hand in ตั้งค่า → ผู้ใช้งาน) */
+  is_admin?: boolean;
 }
 
 /**
@@ -26,7 +28,7 @@ export function planAuthBans(rows: ProfileAccessRow[]): { ban: string[]; unban: 
   const ban: string[] = [];
   const unban: string[] = [];
   for (const r of rows) {
-    if (!r.is_active && r.auth_banned_at == null) ban.push(r.id);
+    if (!r.is_active && r.auth_banned_at == null && !r.is_admin) ban.push(r.id);
     else if (r.is_active && r.auth_banned_at != null) unban.push(r.id);
   }
   return { ban, unban };

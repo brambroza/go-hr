@@ -14,6 +14,13 @@ export interface QueuedCheckin {
   tries?: number;
   /** selfie taken while offline (small JPEG data URL) — uploaded at sync time; locations that require a photo would otherwise reject the punch forever */
   photo_data?: string | null;
+  /** storage reference once the selfie was uploaded (so a retry after a network error does not upload it again) */
+  photo_url?: string | null;
+}
+
+/** Items that belong to other people and are older than `maxAgeMs` (a shared phone must not keep selfies / positions around) */
+export function staleOthers(list: QueuedCheckin[], employeeId: number | null | undefined, now: number, maxAgeMs: number): QueuedCheckin[] {
+  return partitionQueue(list, employeeId).others.filter((q) => now - Date.parse(q.log_time) > maxAgeMs);
 }
 
 /** Largest photo kept per queued punch (data URL length) — localStorage is small and shared with everything else */

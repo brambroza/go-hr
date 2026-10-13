@@ -15,6 +15,12 @@ test("nextFailureState: counts up and locks at max_failed", () => {
   assert.equal(s3.locked_until, new Date(now.getTime() + 120_000 + 15 * 60_000).toISOString());
 });
 
+test("nextFailureState: an active lock is not extended by more attempts", () => {
+  const locked = { fails: 3, last_at: now.toISOString(), locked_until: new Date(now.getTime() + 15 * 60_000).toISOString() };
+  const later = new Date(now.getTime() + 5 * 60_000);
+  assert.deepEqual(nextFailureState(locked, policy, later), locked);
+});
+
 test("nextFailureState: max_failed = 0 switches the lockout off", () => {
   assert.equal(nextFailureState(null, { max_failed: 0, lock_minutes: 15 }, now), null);
 });

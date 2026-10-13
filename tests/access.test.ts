@@ -24,6 +24,11 @@ test("planAuthBans: bans inactive profiles that are not banned yet", () => {
   assert.deepEqual(r, { ban: ["a"], unban: [] });
 });
 
+test("planAuthBans: never bans an administrator account", () => {
+  const r = planAuthBans([{ id: "adm", is_active: false, auth_banned_at: null, is_admin: true }]);
+  assert.deepEqual(r, { ban: [], unban: [] });
+});
+
 test("planAuthBans: unbans re-activated profiles", () => {
   const r = planAuthBans([{ id: "b", is_active: true, auth_banned_at: "2026-10-01T00:00:00Z" }]);
   assert.deepEqual(r, { ban: [], unban: ["b"] });

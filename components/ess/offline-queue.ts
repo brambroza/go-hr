@@ -7,7 +7,7 @@
 import { supabaseBrowser } from "@/lib/supabase/client";
 import { uploadFile } from "@/lib/storage";
 import { errText, isNetworkError, uuid } from "./lib";
-import { markQueueError, normalizeQueue, partitionQueue, type QueuedCheckin } from "./offline-queue-core";
+import { markQueueError, normalizeQueue, partitionQueue, staleOthers, type QueuedCheckin } from "./offline-queue-core";
 
 export type { QueuedCheckin } from "./offline-queue-core";
 
@@ -53,6 +53,13 @@ export function clearQueue() {
   write([]);
 }
 
+/** Forget other people's items older than `maxAgeMs` (their selfie / position must not stay on a shared phone) */
+export function pruneOthers(employeeId: number | null | undefined, maxAgeMs = 7 * 86_400_000) {
+  const all = read();
+  const stale = new Set(staleOthers(all, employeeId, Date.now(), maxAgeMs).map((q) => q.client_ref));
+  if (stale.size) write(all.filter((q) => !stale.has(q.client_ref)));
+}
+
 export function onQueueChange(fn: () => void): () => void {
   window.addEventListener(EVENT, fn);
   window.addEventListener("storage", fn);
@@ -77,16 +84,21 @@ export function syncQueue(employeeId: number | null | undefined): Promise<{ sync
     const sb = supabaseBrowser();
     for (const q of queuedCheckins(key)) {
       // the selfie taken offline goes to storage first; a network failure keeps the item for the next round
-      let photoUrl: string | null = null;
-      if (q.photo_data) {
+      let photoUrl: string | null = q.photo_url ?? null;
+      if (!photoUrl && q.photo_data) {
         try {
           const blob = await (await fetch(q.photo_data)).blob();
           photoUrl = (await uploadFile("checkins", blob, { folder: q.log_time.slice(0, 10), name: "selfie.jpg" })).url;
+          // remember the upload so a later network error does not create a second copy
+          write(read().map((x) => (x.client_ref === q.client_ref ? { ...x, photo_url: photoUrl, photo_data: null } : x)));
         } catch (e) {
-          failed++;
-          if (isNetworkError(e)) break;
-          write(markQueueError(read(), q.client_ref, "อัปโหลดรูปไม่สำเร็จ: " + errText(e)));
-          continue;
+          if (isNetworkError(e)) {
+            failed++;
+            break;
+          }
+          // the photo itself was refused (type / size) — a punch without a photo is still better than no punch;
+          // a location that requires one rejects it below with its own message
+          photoUrl = null;
         }
       }
       const { error } = await sb.rpc("check_in", {

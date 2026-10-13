@@ -6,8 +6,9 @@ import { useEffect, useState, type ReactNode } from "react";
 import { FileText, Fingerprint, Home, LayoutGrid, Monitor, Receipt, WifiOff } from "lucide-react";
 import { clsx, toast } from "@/components/ui";
 import { Notifications } from "@/components/app/app-shell";
-import { onQueueChange, queuedCheckins, syncQueue } from "./offline-queue";
+import { clearQueue, onQueueChange, pruneOthers, queuedCheckins, syncQueue } from "./offline-queue";
 import { useMe } from "@/components/app/me-context";
+import { supabaseBrowser } from "@/lib/supabase/client";
 
 const TABS = [
   { href: "/m", label: "หน้าแรก", icon: Home, exact: true },
@@ -32,6 +33,11 @@ export function EssShell({ company, backOffice, children }: { company: { name: s
     if ("serviceWorker" in navigator && (process.env.NODE_ENV === "production" || location.search.includes("sw=1"))) {
       navigator.serviceWorker.register("/sw.js", { scope: "/" }).catch(() => {});
     }
+    // a shared phone must not keep other people's selfies / positions; a session that ends elsewhere (ban, expiry) drops the queue too
+    pruneOthers(employeeId);
+    const { data: authSub } = supabaseBrowser().auth.onAuthStateChange((event) => {
+      if (event === "SIGNED_OUT") clearQueue();
+    });
     const refresh = () => setQueued(queuedCheckins(employeeId).length);
     refresh();
     const off = onQueueChange(refresh);
@@ -52,6 +58,7 @@ export function EssShell({ company, backOffice, children }: { company: { name: s
     const t = setInterval(doSync, 60_000);
     return () => {
       off();
+      authSub.subscription.unsubscribe();
       window.removeEventListener("online", on);
       window.removeEventListener("offline", offl);
       clearInterval(t);

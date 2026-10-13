@@ -9,7 +9,7 @@ const PAGES = `${VERSION}-pages`;
 const OFFLINE_URL = "/m/offline";
 const PRECACHE = [OFFLINE_URL, "/m", "/m/checkin", "/manifest.webmanifest", "/icon.svg", "/icons/icon-192.png", "/icons/icon-512.png"];
 // Pages with personal / salary data are never stored for offline use (keep in step with lib/pwa.ts NO_CACHE_PATTERNS)
-const NO_CACHE = [/^\/m\/payslips(\/|$)/, /^\/m\/profile(\/|$)/, /^\/m\/evaluations(\/|$)/, /^\/m\/approvals(\/|$)/, /^\/m\/team(\/|$)/, /^\/m\/requests\/\d+/];
+const NO_CACHE = [/^\/m\/payslips(\/|$)/, /^\/m\/profile(\/|$)/, /^\/m\/evaluations(\/|$)/, /^\/m\/approvals(\/|$)/, /^\/m\/team(\/|$)/, /^\/m\/requests(\/|$)/, /^\/m\/leave(\/|$)/, /^\/m\/calendar(\/|$)/, /^\/m\/todos(\/|$)/, /^\/m\/feed(\/|$)/, /^\/m\/notifications(\/|$)/];
 const cacheable = (pathname) => pathname.startsWith("/m") && !NO_CACHE.some((r) => r.test(pathname));
 
 self.addEventListener("install", (event) => {
@@ -81,6 +81,12 @@ self.addEventListener("message", (event) => {
   if (event.data === "skipWaiting") self.skipWaiting();
   // sign-out: forget every cached page so the next person on this device cannot open them offline
   if (event.data && event.data.type === "clearPages") {
-    event.waitUntil(caches.delete(PAGES).then(() => event.ports && event.ports[0] && event.ports[0].postMessage("ok")));
+    event.waitUntil(
+      caches
+        .delete(PAGES)
+        .then(() => caches.open(SHELL))
+        .then((c) => Promise.all(["/m", "/m/checkin"].map((p) => c.delete(p, { ignoreSearch: true })))) // personalised shell pages
+        .then(() => event.ports && event.ports[0] && event.ports[0].postMessage("ok")),
+    );
   }
 });

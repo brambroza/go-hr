@@ -94,6 +94,11 @@ test("round_mode baht: every line and the net pay are whole baht", () => {
   }));
   for (const l of r.lines) assert.equal(l.amount, Math.round(l.amount), `${l.code} = ${l.amount}`);
   assert.equal(r.net_pay, Math.round(r.net_pay));
+  // entry fields that feed ภ.ง.ด.1 / PVD files must equal the printed lines
+  const lineOf = (c: string) => r.lines.find((l) => l.code === c)?.amount ?? 0;
+  assert.equal(r.tax, lineOf("TAX"));
+  assert.equal(r.pvd_employee, lineOf("PVD"));
+  assert.equal(r.sso_employee, lineOf("SSO"));
   const satang = computeEntry(base({
     priv: { salary: 30001, salary_unit: "month", sso_enabled: true, pvd_enabled: false, pvd_employee_rate: 0, pvd_employer_rate: 0, tax_method: "annualized", tax_fixed_rate: null },
     att: { work_days: 20, paid_holiday_days: 0, paid_leave_days: 0, unpaid_leave_days: 0, absent_days: 0, late_minutes: 7, early_minutes: 0, work_minutes: 0, ot_minutes: {}, late_count: 1 },

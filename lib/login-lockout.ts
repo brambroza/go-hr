@@ -20,6 +20,8 @@ export function nextFailureState(prev: FailureState | null, policy: LockoutPolic
   if (max <= 0) return null;
   const mins = Math.max(1, Math.floor(Number(policy.lock_minutes) || 0));
   const windowStart = now.getTime() - mins * 60_000;
+  // an active lock is never extended by further attempts (otherwise anyone could keep a known account locked for ever)
+  if (prev?.locked_until && Date.parse(prev.locked_until) > now.getTime()) return prev;
   let fails: number;
   if (!prev) fails = 1;
   else if (prev.locked_until && Date.parse(prev.locked_until) <= now.getTime()) fails = 1; // an expired lock starts over

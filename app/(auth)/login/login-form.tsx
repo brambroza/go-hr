@@ -4,8 +4,8 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Eye, EyeOff } from "lucide-react";
 import { Button, Checkbox, Field, Input } from "@/components/ui";
-import { supabaseBrowser } from "@/lib/supabase/client";
 import { REMEMBER_LOGIN_KEY, SESSION_ONLY_COOKIE } from "@/lib/supabase/cookie";
+import { loginAction } from "./actions";
 
 const secure = () => (typeof location !== "undefined" && location.protocol === "https:" ? "; Secure" : "");
 
@@ -37,7 +37,7 @@ export function LoginForm({ next }: { next: string }) {
     e.preventDefault();
     setError(null);
     setLoading(true);
-    // must be set before signInWithPassword writes the auth cookie
+    // must be set before the server writes the auth cookie (it reads the marker from the request cookies)
     setSessionOnly(!remember);
     try {
       if (remember) localStorage.setItem(REMEMBER_LOGIN_KEY, login.trim());
@@ -45,25 +45,18 @@ export function LoginForm({ next }: { next: string }) {
     } catch {
       /* ignore */
     }
-    const sb = supabaseBrowser();
-    const typed = login.trim();
-    // username / employee code / e-mail → auth e-mail; raises while the account is locked (password policy)
-    const resolved = await sb.rpc("resolve_login", { p_login: typed });
-    if (resolved.error) {
+    // the sign-in itself runs on the server: username → e-mail lookup, lockout check and failure counting never reach the browser
+    let r: Awaited<ReturnType<typeof loginAction>>;
+    try {
+      r = await loginAction(login, password);
+    } catch {
+      r = { ok: false, error: "เชื่อมต่อเซิร์ฟเวอร์ไม่ได้ กรุณาลองใหม่อีกครั้ง" };
+    }
+    if (!r.ok) {
       setLoading(false);
-      setError(resolved.error.message);
+      setError(r.error);
       return;
     }
-    const email = (resolved.data as string | null) ?? (typed.includes("@") ? typed : `${typed}@invalid.local`);
-    const { error } = await sb.auth.signInWithPassword({ email, password });
-    if (error) {
-      // count the failure for the lockout policy (silent for unknown logins)
-      sb.rpc("login_failed", { p_login: typed }).then(() => undefined, () => undefined);
-      setLoading(false);
-      setError(error.message.includes("Invalid login") ? "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง" : error.message);
-      return;
-    }
-    await sb.rpc("record_login");
     router.replace(next);
     router.refresh();
   }
@@ -87,7 +80,6 @@ export function LoginForm({ next }: { next: string }) {
         เข้าสู่ระบบ
       </Button>
       <p className="text-sm text-ink-mute">ลืมรหัสผ่าน? ติดต่อฝ่ายบุคคลเพื่อรีเซ็ตรหัสผ่าน</p>
-     
     </form>
   );
 }

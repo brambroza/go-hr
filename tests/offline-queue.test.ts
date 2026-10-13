@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { markQueueError, MAX_QUEUED_PHOTO_CHARS, normalizeQueue, partitionQueue, photoForQueue, type QueuedCheckin } from "../components/ess/offline-queue-core";
+import { markQueueError, MAX_QUEUED_PHOTO_CHARS, normalizeQueue, partitionQueue, photoForQueue, staleOthers, type QueuedCheckin } from "../components/ess/offline-queue-core";
 
 const item = (ref: string, emp: number): QueuedCheckin => ({ client_ref: ref, log_time: "2026-10-10T01:00:00.000Z", latitude: 13.7, longitude: 100.5, accuracy: 10, direction: "auto", employee_id: emp });
 
@@ -30,6 +30,15 @@ test("markQueueError: records the error on one item and counts tries", () => {
   assert.equal(r[0].error, "อยู่นอกพื้นที่");
   assert.equal(r[0].tries, 2);
   assert.equal(r[1].error, undefined);
+});
+
+test("staleOthers: other people's old items only", () => {
+  const day = 86_400_000;
+  const now = Date.parse("2026-10-10T00:00:00.000Z");
+  const old = { ...item("o", 2), log_time: new Date(now - 8 * day).toISOString() };
+  const fresh = { ...item("f", 2), log_time: new Date(now - 1 * day).toISOString() };
+  const mineOld = { ...item("m", 1), log_time: new Date(now - 30 * day).toISOString() };
+  assert.deepEqual(staleOthers([old, fresh, mineOld], 1, now, 7 * day).map((q) => q.client_ref), ["o"]);
 });
 
 test("photoForQueue: keeps a small image data URL, drops anything else", () => {

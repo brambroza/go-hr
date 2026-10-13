@@ -249,20 +249,31 @@ export interface JobResult { code: string; status: "ok" | "error" | "skipped"; m
 
 /** Ban / unban Supabase auth users so sign-in matches profiles.is_active (profiles.auth_banned_at records it) */
 export async function syncAuthBans(sb: Admin): Promise<{ banned: number; unbanned: number; errors: number }> {
-  const rows = (must(await sb.from("profiles").select("id, is_active, auth_banned_at").or("and(is_active.eq.false,auth_banned_at.is.null),and(is_active.eq.true,auth_banned_at.not.is.null)")) ?? []) as ProfileAccessRow[];
+  const rows = (must(await sb.from("profiles").select("id, is_active, auth_banned_at, is_admin").or("and(is_active.eq.false,auth_banned_at.is.null),and(is_active.eq.true,auth_banned_at.not.is.null)")) ?? []) as ProfileAccessRow[];
   const plan = planAuthBans(rows);
   let banned = 0, unbanned = 0, errors = 0;
+  // one failing account (e.g. a profile without an auth user) must not stop the others — count it and move on
   for (const id of plan.ban) {
-    const { error } = await sb.auth.admin.updateUserById(id, { ban_duration: BAN_FOREVER });
-    if (error) { errors++; continue; }
-    must(await sb.from("profiles").update({ auth_banned_at: new Date().toISOString() }).eq("id", id).select("id"));
-    banned++;
+    try {
+      const { error } = await sb.auth.admin.updateUserById(id, { ban_duration: BAN_FOREVER });
+      if (error) throw new Error(error.message);
+      must(await sb.from("profiles").update({ auth_banned_at: new Date().toISOString() }).eq("id", id).select("id"));
+      banned++;
+    } catch (e) {
+      errors++;
+      console.warn(`syncAuthBans: ban ${id} failed: ${(e as Error).message}`);
+    }
   }
   for (const id of plan.unban) {
-    const { error } = await sb.auth.admin.updateUserById(id, { ban_duration: "none" });
-    if (error) { errors++; continue; }
-    must(await sb.from("profiles").update({ auth_banned_at: null }).eq("id", id).select("id"));
-    unbanned++;
+    try {
+      const { error } = await sb.auth.admin.updateUserById(id, { ban_duration: "none" });
+      if (error) throw new Error(error.message);
+      must(await sb.from("profiles").update({ auth_banned_at: null }).eq("id", id).select("id"));
+      unbanned++;
+    } catch (e) {
+      errors++;
+      console.warn(`syncAuthBans: unban ${id} failed: ${(e as Error).message}`);
+    }
   }
   return { banned, unbanned, errors };
 }

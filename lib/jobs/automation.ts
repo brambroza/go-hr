@@ -59,10 +59,11 @@ async function findHits(sb: Admin, rule: Rule, emps: Map<number, Emp>, since: st
     case "request.approved":
     case "request.rejected": {
       const status = rule.trigger === "request.submitted" ? null : rule.trigger === "request.approved" ? "approved" : "rejected";
-      let q = sb.from("requests").select("id, doc_no, request_type, employee_id, status, start_date, created_at, updated_at, result_note").order("id").limit(1000);
+      let q = sb.from("requests").select("id, doc_no, request_type, employee_id, status, start_date, created_at, updated_at, result_note, payload").order("id").limit(1000);
       q = status ? q.eq("status", status).gte("updated_at", since) : q.neq("status", "draft").gte("created_at", since);
       if (types) q = q.in("request_type", types);
-      const rows = must(await q) ?? [];
+      // a complaint filed as confidential must not reach the supervisor through an automation rule either — the workflow already notifies HR
+      const rows = (must(await q) ?? []).filter((r) => !(r.request_type === "complaint" && (r.payload as { confidential?: boolean } | null)?.confidential));
       if (!Object.keys(REQ_TYPE_LABEL).length) {
         for (const t of must(await sb.from("request_types").select("code, name")) ?? []) REQ_TYPE_LABEL[t.code as string] = t.name as string;
       }

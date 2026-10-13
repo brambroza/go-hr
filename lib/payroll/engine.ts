@@ -291,8 +291,9 @@ export function computeEntry(input: EmployeePayInput): EntryResult {
   let pvdEmp = 0;
   let pvdEr = 0;
   if (period.include_pvd && priv.pvd_enabled) {
-    pvdEmp = r2((pvdBase * (Number(priv.pvd_employee_rate) || 0)) / 100);
-    pvdEr = r2((pvdBase * (Number(priv.pvd_employer_rate) || 0)) / 100);
+    // rounded the same way as the pay line so entry.pvd_employee always equals the PVD line (also in baht mode)
+    pvdEmp = rm((pvdBase * (Number(priv.pvd_employee_rate) || 0)) / 100);
+    pvdEr = rm((pvdBase * (Number(priv.pvd_employer_rate) || 0)) / 100);
     if (pvdEmp) lines.push(mkSys(items.pvd, pvdEmp, "กองทุนสำรองเลี้ยงชีพ", cfg.round_mode));
   }
 
@@ -301,7 +302,7 @@ export function computeEntry(input: EmployeePayInput): EntryResult {
   let taxDetail: unknown = null;
   if (period.include_tax && priv.tax_method !== "none") {
     if (priv.tax_method === "fixed_rate") {
-      tax = r2((Math.max(0, taxable) * (Number(priv.tax_fixed_rate) || 0)) / 100);
+      tax = rm((Math.max(0, taxable) * (Number(priv.tax_fixed_rate) || 0)) / 100);
     } else {
       const { maxEmployee } = ssoLimits(period.pay_date, ssoCfg);
       const monthRegular = regularTaxable + input.monthPrev.regular;
@@ -324,7 +325,7 @@ export function computeEntry(input: EmployeePayInput): EntryResult {
         },
         taxCfg,
       );
-      tax = Math.max(0, r2(w.tax - input.monthPrev.tax));
+      tax = Math.max(0, rm(w.tax - input.monthPrev.tax)); // same rounding as the tax line (entry.tax feeds ภ.ง.ด.1)
       taxDetail = { projected_income: w.projectedIncome, annual_tax: w.annualTaxWithCurrentIrregular, allowances: w.detail.allowances, net_income: w.detail.netIncome };
     }
     if (tax) lines.push(mkSys(items.tax, tax, "ภาษีเงินได้หัก ณ ที่จ่าย", cfg.round_mode));

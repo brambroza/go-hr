@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requirePerm, safeAction, type ActionResult } from "@/lib/auth";
 import { supabaseAdmin } from "@/lib/supabase/admin";
 import { checkPassword, normalizePolicy, type PasswordPolicy } from "./password";
+import { employeeAllowed } from "@/lib/jobs/access";
 
 type Admin = ReturnType<typeof supabaseAdmin>;
 
@@ -159,6 +160,17 @@ export async function setActiveAction(userId: string, active: boolean): Promise<
     const me = await requirePerm("security", "edit");
     if (userId === me.userId && !active) throw new Error("ไม่สามารถปิดการใช้งานบัญชีของตัวเองได้");
     const sb = supabaseAdmin();
+    if (active) {
+      // an employee who has left cannot be re-enabled here — the resign sync would lock the account again tonight
+      const { data: prof } = await sb.from("profiles").select("employee_id, is_admin").eq("id", userId).maybeSingle();
+      if (prof?.employee_id && !prof.is_admin) {
+        const { data: emp } = await sb.from("employees").select("status, resign_date").eq("id", prof.employee_id).maybeSingle();
+        const todayBkk = new Date(Date.now() + 7 * 3600 * 1000).toISOString().slice(0, 10);
+        if (emp && !employeeAllowed(emp.status as string, emp.resign_date as string | null, todayBkk)) {
+          throw new Error("พนักงานคนนี้พ้นสภาพแล้ว เปิดบัญชีไม่ได้ — ถ้าต้องการให้กลับมาใช้งาน ให้แก้สถานะ / วันที่ลาออกที่ประวัติพนักงานก่อน");
+        }
+      }
+    }
     // a manual change wins over the automatic resign lock (locked_by_resign = false), and auth_banned_at keeps the daily job in step
     const { error } = await sb.from("profiles").update({ is_active: active, locked_by_resign: false, auth_banned_at: active ? null : new Date().toISOString() }).eq("id", userId);
     if (error) throw new Error(error.message);

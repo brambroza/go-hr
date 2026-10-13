@@ -567,16 +567,26 @@ export async function staleCalculationReasons(periodId: number): Promise<string[
   const sb = supabaseAdmin();
   const period = await loadPeriod(periodId);
   const out: string[] = [];
-  const { entries, items } = await entryItemsBySource(periodId, Object.keys(PENDING_SOURCE_LABEL));
+  // pay lines that came from the pending inbox carry source = <pending source> (incl. "<source>_revert") and source_id = pending item id.
+  // Adjustments share the same source values ("manual" …) with their own id sequence, so a cancelled pending item only counts
+  // when source, id, employee and amount all match the line.
+  const sources = Object.keys(PENDING_SOURCE_LABEL).flatMap((k) => [k, `${k}_revert`]);
+  const { entries, items } = await entryItemsBySource(periodId, sources);
+  const empOfEntry = new Map(entries.map((e) => [e.id, Number(e.employee_id)]));
+  const lineKeys = new Set(items.map((i) => `${i.source}:${i.source_id}:${empOfEntry.get(i.entry_id)}:${r2(Number(i.amount))}`));
   const refs = [...new Set(items.map((i) => i.source_id).filter((v): v is number => v != null))];
   if (refs.length) {
-    const cancelled = await fetchByIds<{ id: number }>(refs, (part) => sb.from("payroll_pending_items").select("id").in("id", part).eq("status", "cancelled"));
-    if (cancelled.length) out.push(`รายการที่ถูกยกเลิกหลังคำนวณ ${cancelled.length} รายการ`);
+    const cancelled = await fetchByIds<{ id: number; employee_id: number; source: string; amount: number }>(refs, (part) =>
+      sb.from("payroll_pending_items").select("id, employee_id, source, amount").in("id", part).eq("status", "cancelled"),
+    );
+    const hit = cancelled.filter((c) => lineKeys.has(`${c.source}:${c.id}:${Number(c.employee_id)}:${r2(Number(c.amount))}`));
+    if (hit.length) out.push(`รายการที่ถูกยกเลิกหลังคำนวณ ${hit.length} รายการ`);
   }
   if (period.period_type === "monthly" && entries.length) {
+    // same rule as selectPendingForPeriod(): unassigned rows (pending, or applied whose period was deleted) due on or before the period end
     const waiting = await fetchByIds<{ id: number }>(
       entries.map((e) => e.employee_id),
-      (part) => sb.from("payroll_pending_items").select("id").in("employee_id", part).eq("status", "pending").is("period_id", null).lte("effective_date", period.end_date),
+      (part) => sb.from("payroll_pending_items").select("id").in("employee_id", part).in("status", ["pending", "applied"]).is("period_id", null).lte("effective_date", period.end_date),
     );
     if (waiting.length) out.push(`สวัสดิการ / เงินสดย่อยที่อนุมัติหลังคำนวณ ${waiting.length} รายการ`);
   }
