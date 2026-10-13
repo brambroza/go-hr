@@ -9,6 +9,7 @@ import { Notifications } from "@/components/app/app-shell";
 import { clearQueue, onQueueChange, pruneOthers, queuedCheckins, syncQueue } from "./offline-queue";
 import { useMe } from "@/components/app/me-context";
 import { supabaseBrowser } from "@/lib/supabase/client";
+import type { AuthChangeEvent } from "@supabase/supabase-js";
 
 const TABS = [
   { href: "/m", label: "หน้าแรก", icon: Home, exact: true },
@@ -35,7 +36,7 @@ export function EssShell({ company, backOffice, children }: { company: { name: s
     }
     // a shared phone must not keep other people's selfies / positions; a session that ends elsewhere (ban, expiry) drops the queue too
     pruneOthers(employeeId);
-    const { data: authSub } = supabaseBrowser().auth.onAuthStateChange((event) => {
+    const { data: authSub } = supabaseBrowser().auth.onAuthStateChange((event: AuthChangeEvent) => {
       if (event === "SIGNED_OUT") clearQueue();
     });
     const refresh = () => setQueued(queuedCheckins(employeeId).length);
