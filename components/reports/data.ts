@@ -63,6 +63,8 @@ export { fetchRows, fetchRowsIn };
 export type TaxRow = {
   employee_id: number; emp?: EmpLite; priv?: PrivLite; addr?: AddrLite;
   income: number; tax: number; sso: number; pvd: number; pay_date: string;
+  /** latest pay date of the year (or month) for this employee — also kept in year mode, where pay_date is 31 Dec */
+  last_pay_date: string;
   /** เงื่อนไขการหักภาษี: 1 หัก ณ ที่จ่าย, 2 ออกให้ตลอดไป (tax_paid_by_employer) */
   condition: 1 | 2 | 3;
   /** ลำดับที่ in the ใบแนบ (1-based, continuous over all sheets) */
@@ -80,13 +82,14 @@ export async function loadTaxRows(year: number, month: number | undefined, branc
   const by = new Map<number, TaxRow>();
   for (const e of entries) {
     if (branchId && String(e.branch_id) !== branchId) continue;
-    const r = by.get(e.employee_id) ?? { employee_id: e.employee_id, income: 0, tax: 0, sso: 0, pvd: 0, pay_date: "", condition: 1 as const, seq: 0 };
+    const r = by.get(e.employee_id) ?? { employee_id: e.employee_id, income: 0, tax: 0, sso: 0, pvd: 0, pay_date: "", last_pay_date: "", condition: 1 as const, seq: 0 };
     r.income += Number(e.taxable_income);
     r.tax += Number(e.tax);
     r.sso += Number(e.sso_employee);
     r.pvd += Number(e.pvd_employee);
     const pd = payDate.get(e.period_id) ?? "";
     if (pd > r.pay_date) r.pay_date = pd;
+    if (pd > r.last_pay_date) r.last_pay_date = pd;
     by.set(e.employee_id, r);
   }
   const people = await loadPeople([...by.keys()], withAddress);

@@ -80,7 +80,7 @@ const EMPLOYMENT: FieldDef[] = [
   { name: "confirm_date", label: "วันผ่านทดลองงาน (บรรจุ)", type: "date", section: "สัญญาจ้าง" },
   { name: "contract_end_date", label: "วันสิ้นสุดสัญญา", type: "date", section: "สัญญาจ้าง", hidden: (v) => !["contract", "intern", "parttime"].includes(String(v.employee_type)) && v.status !== "contract" },
   { name: "resign_date", label: "วันที่ลาออก", type: "date", section: "การพ้นสภาพ", hidden: (v) => v.status !== "resigned" },
-  { name: "resign_type", label: "ประเภทการพ้นสภาพ", type: "select", options: listOptions(["ลาออกเอง", "เลิกจ้าง", "เกษียณ", "หมดสัญญา", "เสียชีวิต", "อื่น ๆ"]), section: "การพ้นสภาพ", hidden: (v) => v.status !== "resigned" },
+  { name: "resign_type", label: "ประเภทการพ้นสภาพ", type: "select", options: listOptions(["ลาออกเอง", "เลิกจ้าง", "เลิกจ้างกรณีความผิดร้ายแรง (ม.119)", "เกษียณ", "หมดสัญญา", "เสียชีวิต", "อื่น ๆ"]), section: "การพ้นสภาพ", hidden: (v) => v.status !== "resigned" },
   { name: "resign_reason", label: "เหตุผล", type: "textarea", section: "การพ้นสภาพ", hidden: (v) => v.status !== "resigned" },
   { name: "default_shift_id", label: "กะการทำงานเริ่มต้น", type: "ref", ref: { table: "shifts", select: "id, code, name", order: "code", label: "name" }, section: "เวลาทำงาน" },
   { name: "weekly_off_days", label: "วันหยุดประจำสัปดาห์", type: "weekdays", section: "เวลาทำงาน" },

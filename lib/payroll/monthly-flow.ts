@@ -20,6 +20,8 @@ export interface FlowPeriod {
   net_total: number;
   tax_total: number;
   sso_total: number;
+  /** เงินสะสม + เงินสมทบกองทุนสำรองเลี้ยงชีพ (0 = no member → no PVD step) */
+  pvd_total?: number;
 }
 
 export interface FlowFiling {
@@ -128,6 +130,14 @@ export function buildMonthlyFlow(i: FlowInput): FlowStep[] {
       filingKind: "pnd1", filing: filing("pnd1"), done: !!filing("pnd1"),
     },
   ];
+  if ((p?.pvd_total ?? 0) > 0 || filing("pvd")) {
+    steps.push({
+      key: "pvd", title: "นำส่งกองทุนสำรองเลี้ยงชีพ",
+      description: "สร้างไฟล์เงินสะสม / เงินสมทบรายคน ส่งบริษัทจัดการกองทุน โอนเงิน แล้วบันทึกเลขอ้างอิงไว้",
+      due: addDaysIso(pay, 3), dueNote: "ภายใน 3 วันทำการนับจากวันจ่ายค่าจ้าง",
+      filingKind: "pvd", filing: filing("pvd"), done: !!filing("pvd"),
+    });
+  }
   if (i.month === 12) {
     steps.push({
       key: "pnd1a", title: "ภ.ง.ด.1ก และหนังสือรับรอง 50 ทวิ (สิ้นปี)",

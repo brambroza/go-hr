@@ -10,6 +10,7 @@ import { computeEntry, DEFAULT_PAYROLL_CONFIG, type EmployeePayInput, type LineI
 import { DEFAULT_SSO_CONFIG, DEFAULT_TAX_CONFIG, type SsoConfig, type TaxConfig } from "./tax";
 import { computeLeavePay, expandLeaveRequest, nextDate, type LeaveDay, type LeaveTypeRule } from "./leave";
 import { PENDING_SOURCE_LABEL, pendingToRelease, selectPendingForPeriod, type PendingItem } from "./pending";
+import { salaryAsOf } from "./retro";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Q = any;
@@ -48,6 +49,7 @@ function must<T>(r: { data: T | null; error: { message: string } | null }): T {
 const r2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
 const firstOfMonth = (y: number, m: number) => `${y}-${String(m).padStart(2, "0")}-01`;
 const dow = (d: string) => new Date(d + "T00:00:00Z").getUTCDay();
+const shiftDate = (d: string, n: number) => new Date(Date.parse(d + "T00:00:00Z") + n * 86_400_000).toISOString().slice(0, 10);
 
 export interface PeriodRow {
   id: number;
@@ -117,12 +119,27 @@ export async function calculatePeriod(periodId: number, opts: { employeeIds?: nu
   return calculatePeriodUnchecked(periodId, opts);
 }
 
-/** calculation without the permission check — for cron jobs / scripts that already authorised the caller */
-export async function calculatePeriodUnchecked(periodId: number, opts: { employeeIds?: number[] } = {}): Promise<CalcResult> {
+/** in-memory recalculation of a period (retro pay): nothing is written except a forced attendance recalculation */
+export interface SimulatedEntry {
+  employee_id: number;
+  lines: ReturnType<typeof computeEntry>["lines"];
+  warnings: string[];
+}
+
+/**
+ * calculation without the permission check — for cron jobs / scripts that already authorised the caller.
+ * `simulate`: recalculate an approved / paid / closed period in memory with today's data and put the result in
+ * `simulate.result` instead of writing entries (lib/payroll/retro.ts). Attendance of the range is recalculated with
+ * force (re-locked afterwards for a closed period); the salary is the one in force at the period end; only pending
+ * money already paid in this period is included.
+ */
+export async function calculatePeriodUnchecked(periodId: number, opts: { employeeIds?: number[]; simulate?: { result?: SimulatedEntry[] } } = {}): Promise<CalcResult> {
   const t0 = Date.now();
   const sb = supabaseAdmin();
   const period = await loadPeriod(periodId);
-  if (!["open", "calculated"].includes(period.status)) throw new Error("งวดนี้อนุมัติแล้ว ต้องกด \"เปิดแก้ไข\" ก่อนจึงจะคำนวณใหม่ได้");
+  const sim = opts.simulate;
+  if (!sim && !["open", "calculated"].includes(period.status)) throw new Error("งวดนี้อนุมัติแล้ว ต้องกด \"เปิดแก้ไข\" ก่อนจึงจะคำนวณใหม่ได้");
+  if (sim && !opts.employeeIds?.length) throw new Error("ระบุพนักงานที่ต้องการคำนวณตกเบิก");
 
   const [payCfgRaw, ssoCfg, taxCfg, attCfg] = await Promise.all([
     settings<Record<string, unknown>>("payroll", {}),
@@ -155,6 +172,26 @@ export async function calculatePeriodUnchecked(periodId: number, opts: { employe
     return q;
   });
   emps = emps.filter((e) => e.status !== "resigned" || (e.resign_date && e.resign_date >= period.start_date));
+  // people who left before this period but still have money in the pending inbox (final settlement, retro) due in it:
+  // they get an entry with only that money — no salary, attendance, recurring items, loans or guarantee
+  const pendingOnly = new Set<number>();
+  if (!sim) {
+    const inRun = new Set(emps.map((e) => e.id));
+    let pq = sb.from("payroll_pending_items").select("employee_id").neq("status", "cancelled").neq("status", "paid");
+    pq = period.period_type === "monthly" ? pq.or(`period_id.eq.${period.id},and(period_id.is.null,effective_date.lte.${period.end_date})`) : pq.eq("period_id", period.id);
+    const waiting = [...new Set(((must(await pq.limit(5000)) ?? []) as { employee_id: number }[]).map((r) => Number(r.employee_id)))].filter((id) => !inRun.has(id));
+    if (waiting.length) {
+      const extra = await fetchByIds<Emp>(waiting, (part) => {
+        let q = sb.from("employees").select("id, code, prefix, first_name, last_name, employee_type, status, hire_date, resign_date, branch_id, org_unit_id, position_id, weekly_off_days, attendance_exempt").in("id", part).not("resign_date", "is", null).lt("resign_date", period.start_date).order("id");
+        if (f.branch_ids?.length) q = q.in("branch_id", f.branch_ids);
+        if (f.employee_types?.length) q = q.in("employee_type", f.employee_types);
+        if (f.employee_ids?.length) q = q.in("id", f.employee_ids);
+        return q;
+      });
+      for (const e of extra) pendingOnly.add(e.id);
+      emps = [...emps, ...extra];
+    }
+  }
   if (opts.employeeIds?.length) {
     const want = new Set(opts.employeeIds.map(Number));
     emps = emps.filter((e) => want.has(e.id));
@@ -168,10 +205,12 @@ export async function calculatePeriodUnchecked(periodId: number, opts: { employe
   let attendanceRecalc = "skipped";
   if (period.include_attendance && ids.length) {
     try {
-      const mod = (await import("@/lib/attendance/server").catch(() => null)) as null | { recalcAttendance?: (o: { from: string; to: string; employeeIds?: number[] }) => Promise<{ days: number }> };
+      const mod = (await import("@/lib/attendance/server").catch(() => null)) as null | { recalcAttendance?: (o: { from: string; to: string; employeeIds?: number[]; force?: boolean }) => Promise<{ days: number }> };
       if (mod?.recalcAttendance) {
-        const r = await mod.recalcAttendance({ from: attFrom, to: attTo, employeeIds: ids });
+        const r = await mod.recalcAttendance({ from: attFrom, to: attTo, employeeIds: ids.filter((id) => !pendingOnly.has(id)), force: !!sim });
         attendanceRecalc = `recalculated ${r.days} days`;
+        if (sim && period.status === "closed")
+          must(await sb.from("attendance_days").update({ is_locked: true }).in("employee_id", ids).gte("work_date", attFrom).lte("work_date", attTo).select("id"));
       } else attendanceRecalc = "module not available";
     } catch (e) {
       attendanceRecalc = `failed: ${e instanceof Error ? e.message : String(e)}`;
@@ -230,10 +269,11 @@ export async function calculatePeriodUnchecked(periodId: number, opts: { employe
       : Promise.resolve([] as AttDay[]),
     inIds<{ id: number; employee_id: number; start_date: string; end_date: string | null; days: number | null; payload: { leave_type_id?: number | string; unit?: string } | null }>(
       "requests", "id, employee_id, start_date, end_date, days, payload",
-      (q) => q.eq("request_type", "leave").eq("status", "approved").lte("start_date", attTo).gte("end_date", `${attFrom.slice(0, 4)}-01-01`),
+      // from 1 Jan for per-year caps; 300 days further back for per-episode caps (maternity leave that started last year)
+      (q) => q.eq("request_type", "leave").eq("status", "approved").lte("start_date", attTo).gte("end_date", shiftDate(`${attFrom.slice(0, 4)}-01-01`, -300)),
     ),
-    fetchAll<{ id: number; name: string; is_paid: boolean; paid_days_limit: number | null; pay_rate_percent: number; count_non_workdays: boolean }>(() =>
-      sb.from("leave_types").select("id, name, is_paid, paid_days_limit, pay_rate_percent, count_non_workdays").order("id"),
+    fetchAll<{ id: number; name: string; is_paid: boolean; paid_days_limit: number | null; pay_rate_percent: number; count_non_workdays: boolean; paid_limit_scope?: string | null }>(() =>
+      sb.from("leave_types").select("*").order("id"),
     ),
     inIds<{ employee_id: number; deduction_code: string; amount: number }>("employee_tax_deductions", "id, employee_id, deduction_code, amount", (q) => q.eq("tax_year", period.pay_year)),
     inIds<{ employee_id: number; relation: string; is_tax_allowance: boolean; is_alive: boolean; is_disabled: boolean }>(
@@ -253,7 +293,19 @@ export async function calculatePeriodUnchecked(periodId: number, opts: { employe
       (q) => q.neq("status", "cancelled").or(`period_id.eq.${period.id},period_id.is.null`),
     ),
   ]);
-  const pendingSel = selectPendingForPeriod(pendingAll, { id: period.id, period_type: period.period_type, end_date: period.end_date }, ids);
+  const pendingSel = sim
+    ? pendingAll.filter((p) => Number(p.period_id) === period.id && p.status !== "pending")
+    : selectPendingForPeriod(pendingAll, { id: period.id, period_type: period.period_type, end_date: period.end_date }, ids);
+  if (sim) {
+    // the salary in force at the end of the period, not today's (a later raise is not retro pay)
+    const hist = await fetchByIds<{ employee_id: number; effective_date: string; new_salary: number }>(ids, (part) =>
+      sb.from("salary_history").select("id, employee_id, effective_date, new_salary").in("employee_id", part).order("id"),
+    );
+    for (const p of privs) {
+      const asOf = salaryAsOf(hist.filter((h) => Number(h.employee_id) === Number(p.employee_id)), period.end_date);
+      if (asOf != null) p.salary = asOf;
+    }
+  }
 
   // ---- index by employee -------------------------------------------------------------------------
   const group = <T extends { employee_id: number }>(rows: T[]) => {
@@ -280,7 +332,7 @@ export async function calculatePeriodUnchecked(periodId: number, opts: { employe
   const leaveBy = group(leaveReqs);
   const ltBy = new Map(leaveTypes.map((t) => [t.id, t]));
   const ltRules: Record<number, LeaveTypeRule> = {};
-  for (const t of leaveTypes) ltRules[t.id] = { is_paid: t.is_paid, paid_days_limit: t.paid_days_limit == null ? null : Number(t.paid_days_limit), pay_rate_percent: Number(t.pay_rate_percent), name: t.name };
+  for (const t of leaveTypes) ltRules[t.id] = { is_paid: t.is_paid, paid_days_limit: t.paid_days_limit == null ? null : Number(t.paid_days_limit), pay_rate_percent: Number(t.pay_rate_percent), name: t.name, paid_limit_scope: t.paid_limit_scope === "episode" ? "episode" : "year" };
   const dedBy = group(taxDed);
   const famBy = group(family);
   const histBy = group(hist);
@@ -304,7 +356,9 @@ export async function calculatePeriodUnchecked(periodId: number, opts: { employe
       warnings.push("ไม่พบข้อมูลเงินเดือน (employee_private)");
     }
     const priv = p ?? ({ employee_id: e.id, salary: 0, salary_unit: "month", pay_method: "cash", bank_code: null, bank_account: null, sso_enabled: false, pvd_enabled: false, pvd_employee_rate: 0, pvd_employer_rate: 0, tax_method: "none", tax_fixed_rate: null, prev_employer_income: 0, prev_employer_tax: 0, prev_employer_sso: 0, prev_employer_pvd: 0 } as Priv);
-    if (!(Number(priv.salary) > 0)) warnings.push("ยังไม่ได้กำหนดเงินเดือน/ค่าจ้าง");
+    const leaverOnly = pendingOnly.has(e.id);
+    if (leaverOnly) warnings.push(`พ้นสภาพแล้ว (${e.resign_date}) — จ่ายเฉพาะเงินค้างจ่ายในคิว`);
+    else if (!(Number(priv.salary) > 0)) warnings.push("ยังไม่ได้กำหนดเงินเดือน/ค่าจ้าง");
     if (priv.pay_method === "bank" && (!priv.bank_account || !priv.bank_code)) warnings.push("จ่ายผ่านธนาคารแต่ยังไม่มีเลขบัญชี");
 
     // ---- attendance summary ----
@@ -335,7 +389,7 @@ export async function calculatePeriodUnchecked(periodId: number, opts: { employe
       // no attendance data → full attendance on scheduled work days
       let wd = 0;
       for (let d = empFrom; d <= empTo; d = nextDate(d)) if (!off.has(dow(d))) wd++;
-      if (!e.attendance_exempt) warnings.push("ไม่พบข้อมูลเวลาทำงานในช่วงตัดรอบ — คำนวณเสมือนมาทำงานครบ");
+      if (!e.attendance_exempt && !leaverOnly) warnings.push("ไม่พบข้อมูลเวลาทำงานในช่วงตัดรอบ — คำนวณเสมือนมาทำงานครบ");
       att = {
         work_days: wd, paid_holiday_days: 0, paid_leave_days: leaveInfo?.paid_leave_days ?? 0, unpaid_leave_days: leaveInfo?.unpaid_leave_days ?? 0, absent_days: 0,
         late_minutes: 0, early_minutes: 0, work_minutes: wd * cfg.hours_per_day * 60, ot_minutes: {}, late_count: 0,
@@ -371,7 +425,8 @@ export async function calculatePeriodUnchecked(periodId: number, opts: { employe
     const line = (item: PayItemDef | undefined, amount: number, extra: Partial<LineInput> = {}): LineInput[] => (item ? [{ item, amount: Number(amount) || 0, ...extra }] : []);
     const consts = (constBy.get(e.id) ?? []).flatMap((c) => line(itemById.get(c.pay_item_id), c.amount, { qty: c.qty, note: c.note, source: "constant", source_id: c.id }));
     const adjs = (adjBy.get(e.id) ?? []).flatMap((a) => line(itemById.get(a.pay_item_id), a.amount, { qty: a.qty, note: a.note, source: a.source ?? "manual", source_id: a.id }));
-    for (const pi of pendingBy.get(e.id) ?? []) adjs.push(...line(itemById.get(pi.pay_item_id), pi.amount, { qty: pi.qty, note: pi.note, source: pi.source, source_id: pi.id }));
+    // retro pay belongs to earlier months: irregular, so the withholding does not project it over the rest of the year
+    for (const pi of pendingBy.get(e.id) ?? []) adjs.push(...line(itemById.get(pi.pay_item_id), pi.amount, { qty: pi.qty, note: pi.note, source: pi.source, source_id: pi.id, irregular: pi.source === "retro" }));
     for (const c of comBy.get(e.id) ?? []) {
       const plan = c.plan_id ? planBy.get(c.plan_id) : undefined;
       const it = (plan?.pay_item_id ? itemById.get(plan.pay_item_id) : undefined) ?? commissionItem;
@@ -440,15 +495,16 @@ export async function calculatePeriodUnchecked(periodId: number, opts: { employe
         salary: Number(priv.salary) || 0, salary_unit: priv.salary_unit, sso_enabled: priv.sso_enabled, pvd_enabled: priv.pvd_enabled,
         pvd_employee_rate: Number(priv.pvd_employee_rate) || 0, pvd_employer_rate: Number(priv.pvd_employer_rate) || 0, tax_method: priv.tax_method, tax_fixed_rate: priv.tax_fixed_rate == null ? null : Number(priv.tax_fixed_rate),
       },
-      period: { ...period },
+      period: leaverOnly ? { ...period, include_salary: false, include_attendance: false, include_constants: false } : { ...period },
       att,
       items: bySys,
-      constants: consts,
+      constants: leaverOnly ? [] : consts,
       adjustments: adjs,
-      loans: loanLines,
-      advances: advLines,
-      guarantee,
-      diligence: dilItem && period.period_type === "monthly" ? { enabled: true, steps: (dil?.steps ?? []).map(Number), prevStep: dilBy.get(e.id) ?? 0, item: dilItem } : null,
+      // deducting debts from final money needs the employee's written consent (ม.76) — HR adds those lines by hand
+      loans: leaverOnly ? [] : loanLines,
+      advances: leaverOnly ? [] : advLines,
+      guarantee: leaverOnly ? null : guarantee,
+      diligence: dilItem && !leaverOnly && period.period_type === "monthly" ? { enabled: true, steps: (dil?.steps ?? []).map(Number), prevStep: dilBy.get(e.id) ?? 0, item: dilItem } : null,
       ytd,
       monthPrev,
       deductions,
@@ -506,6 +562,11 @@ export async function calculatePeriodUnchecked(periodId: number, opts: { employe
       },
     });
     lineSets.push(res.lines);
+  }
+
+  if (sim) {
+    sim.result = entries.map((en, i) => ({ employee_id: Number(en.employee_id), lines: lineSets[i], warnings: ((en.calc_detail as { warnings?: string[] }).warnings ?? []) }));
+    return { employees: entries.length, warnings: warnCount, total_net: r2(entries.reduce((s, e) => s + Number(e.net_pay), 0)), ms: Date.now() - t0, attendance_recalc: attendanceRecalc };
   }
 
   // ---- write ------------------------------------------------------------------------------------
@@ -573,13 +634,14 @@ export async function staleCalculationReasons(periodId: number): Promise<string[
   const sources = Object.keys(PENDING_SOURCE_LABEL).flatMap((k) => [k, `${k}_revert`]);
   const { entries, items } = await entryItemsBySource(periodId, sources);
   const empOfEntry = new Map(entries.map((e) => [e.id, Number(e.employee_id)]));
-  const lineKeys = new Set(items.map((i) => `${i.source}:${i.source_id}:${empOfEntry.get(i.entry_id)}:${r2(Number(i.amount))}`));
+  // pay lines store the absolute amount (a negative pending row becomes a reversed line) — compare absolute values
+  const lineKeys = new Set(items.map((i) => `${i.source}:${i.source_id}:${empOfEntry.get(i.entry_id)}:${r2(Math.abs(Number(i.amount)))}`));
   const refs = [...new Set(items.map((i) => i.source_id).filter((v): v is number => v != null))];
   if (refs.length) {
     const cancelled = await fetchByIds<{ id: number; employee_id: number; source: string; amount: number }>(refs, (part) =>
       sb.from("payroll_pending_items").select("id, employee_id, source, amount").in("id", part).eq("status", "cancelled"),
     );
-    const hit = cancelled.filter((c) => lineKeys.has(`${c.source}:${c.id}:${Number(c.employee_id)}:${r2(Number(c.amount))}`));
+    const hit = cancelled.filter((c) => lineKeys.has(`${c.source}:${c.id}:${Number(c.employee_id)}:${r2(Math.abs(Number(c.amount)))}`));
     if (hit.length) out.push(`รายการที่ถูกยกเลิกหลังคำนวณ ${hit.length} รายการ`);
   }
   if (period.period_type === "monthly" && entries.length) {

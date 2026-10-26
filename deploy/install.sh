@@ -163,5 +163,6 @@ cat <<EOF
   หน้าสมัครงาน            : $PUBLIC_URL/careers
   Supabase Studio         : http://<server-ip>:${KONG_HTTP_PORT:-8000}  (user: ${DASHBOARD_USERNAME:-supabase})  — อย่าเปิดพอร์ตนี้สู่อินเทอร์เน็ต
   สำรองข้อมูลอัตโนมัติ      : เพิ่ม "30 1 * * * $DEPLOY_DIR/backup.sh" ใน crontab ของ root
+  สำรองนอกเครื่อง          : ตั้ง BACKUP_OFFSITE ใน $DEPLOY_DIR/backup.env (ดู backup.env.example) แล้วซ้อมกู้คืน: $DEPLOY_DIR/restore.sh --drill <ไฟล์ dump>
   License                 : ตั้งค่า → License / ระบบ (ยังไม่ติดตั้ง = ทดลองใช้ได้ 10 คน)
 EOF

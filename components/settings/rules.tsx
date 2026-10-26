@@ -31,11 +31,21 @@ type Pay = {
   petty_cash_mode?: "payroll" | "cash";
   /** รายการเงินเดือนที่ใช้จ่ายเงินสดย่อย — ว่าง = รายการที่มี system_key petty_cash (เงินเบิกคืน) */
   petty_cash_pay_item_id?: number | null;
+  /** ยกเว้นภาษีค่าชดเชย ม.42(17) — ตามวันทำงานวันสุดท้าย (lib/payroll/settlement.ts) */
+  severance_exemptions?: { from: string; max_amount: number; max_days: number }[];
+  /** ลาออกเอง: จ่ายวันหยุดพักผ่อนปีปัจจุบันตามสัดส่วน (prorata) หรือเฉพาะวันสะสมยกมา (carried_only) */
+  voluntary_leave_payout?: "prorata" | "carried_only";
+  /** รหัสประเภทการลาที่เป็นลาพักร้อน */
+  annual_leave_code?: string;
+  /** กองทุนสำรองเลี้ยงชีพ — ใช้ในไฟล์นำส่ง */
+  pvd_fund_name?: string;
+  pvd_employer_code?: string;
 };
 const PAY: Pay = {
   daily_divisor: 30, hours_per_day: 8, round_mode: "satang", advance_limit_percent: 50, prorate_new_joiner: true, deduct_absent: true, deduct_late: true, deduct_early: true,
   payslip_password: "birthdate", payslip_show_ytd: true, payslip_note: "", bank_file_format: "bank_generic_csv", company_bank: { bank_code: "004", account: "", branch: "", company_id: "" },
   petty_cash_mode: "payroll", petty_cash_pay_item_id: null,
+  severance_exemptions: [{ from: "2000-01-01", max_amount: 300000, max_days: 300 }], voluntary_leave_payout: "prorata", annual_leave_code: "VACATION",
 };
 type Bracket = { upto: number | null; rate: number };
 type Deduction = { code: string; name: string; max?: number; per_unit?: number; group?: string; retirement?: boolean; donation?: boolean; multiplier?: number };
@@ -215,14 +225,18 @@ function PayrollTab() {
   const pettyItems = payItems.filter((i) => i.is_active && i.direction === 1 && ["welfare", "income"].includes(i.category));
   const bank = { ...PAY.company_bank, ...v.company_bank };
   const setBank = (p: Partial<Pay["company_bank"]>) => set({ company_bank: { ...bank, ...p } });
+  const exemptions = v.severance_exemptions ?? PAY.severance_exemptions ?? [];
+  const setEx = (list: NonNullable<Pay["severance_exemptions"]>) => set({ severance_exemptions: list });
   const submit = () => {
     let e: string | null = null;
     if (!(v.daily_divisor >= 1 && v.daily_divisor <= 31)) e = "ตัวหารรายวันต้องอยู่ระหว่าง 1-31";
     else if (!(v.hours_per_day > 0 && v.hours_per_day <= 24)) e = "ชั่วโมงทำงานต่อวันไม่ถูกต้อง";
     else if (!(v.advance_limit_percent >= 0 && v.advance_limit_percent <= 100)) e = "เพดานเบิกล่วงหน้าต้องอยู่ระหว่าง 0-100%";
     else if (bank.account && !/^\d{10,12}$/.test(bank.account.replace(/\D/g, ""))) e = "เลขบัญชีบริษัทต้องเป็นตัวเลข 10-12 หลัก";
+    else if (!exemptions.length) e = "ต้องมีวงเงินยกเว้นภาษีค่าชดเชยอย่างน้อย 1 ช่วง";
+    else if (exemptions.some((x) => !/^\d{4}-\d{2}-\d{2}$/.test(x.from) || !(x.max_amount > 0) || !(x.max_days > 0))) e = "วงเงินยกเว้นภาษีค่าชดเชย: กรอกวันที่มีผล วงเงิน และจำนวนวันให้ครบ";
     setErr(e);
-    if (!e) save({ ...v, company_bank: { ...bank, account: bank.account.replace(/\D/g, "") } });
+    if (!e) save({ ...v, severance_exemptions: [...exemptions].sort((a, b) => a.from.localeCompare(b.from)), company_bank: { ...bank, account: bank.account.replace(/\D/g, "") } });
   };
   return (
     <div className="flex flex-col gap-4">
@@ -255,6 +269,35 @@ function PayrollTab() {
               {pettyItems.map((i) => <option key={i.id} value={i.id}>{i.code} · {i.name}</option>)}
             </Select>
           </Row>
+        </Panel>
+        <Panel title="กองทุนสำรองเลี้ยงชีพ">
+          <Row label="ชื่อกองทุน"><Input value={v.pvd_fund_name ?? ""} onChange={(e) => set({ pvd_fund_name: e.target.value })} /></Row>
+          <Row label="รหัสนายจ้างที่บริษัทจัดการกำหนด" hint="ใช้ในไฟล์นำส่งเงินสะสม/สมทบ (ถ้ารูปแบบไฟล์ต้องการ)"><Input value={v.pvd_employer_code ?? ""} onChange={(e) => set({ pvd_employer_code: e.target.value.trim() })} /></Row>
+        </Panel>
+        <Panel title="พนักงานพ้นสภาพ (เคลียร์เงิน)">
+          <Row label="ลาออกเอง: ค่าจ้างวันหยุดพักผ่อนที่ยังไม่ได้ใช้" hint="วันสะสมยกมาจ่ายเสมอ (ม.67) · เลิกจ้างจ่ายปีปัจจุบันตามสัดส่วนเสมอ · เลิกจ้างตาม ม.119 จ่ายเฉพาะวันสะสม">
+            <Select value={v.voluntary_leave_payout ?? "prorata"} onChange={(e) => set({ voluntary_leave_payout: e.target.value as Pay["voluntary_leave_payout"] })}>
+              <option value="prorata">จ่ายปีปัจจุบันตามสัดส่วน + วันสะสม</option>
+              <option value="carried_only">จ่ายเฉพาะวันสะสมยกมา</option>
+            </Select>
+          </Row>
+          <Row label="รหัสประเภทการลาพักร้อน" hint="ใช้ดึงวันคงเหลือมาคำนวณ (ค่าเริ่มต้น VACATION)"><Input value={v.annual_leave_code ?? "VACATION"} onChange={(e) => set({ annual_leave_code: e.target.value.trim().toUpperCase() })} /></Row>
+          <div className="mt-2 text-sm font-medium text-ink">วงเงินยกเว้นภาษีค่าชดเชย ม.42(17)</div>
+          <p className="mb-2 text-xs text-ink-mute">ใช้ช่วงที่มีผล ณ วันทำงานวันสุดท้าย · ยกเว้นไม่เกินวงเงิน และไม่เกินค่าจ้าง N วันสุดท้าย · ส่วนที่เกินคิดภาษีรวมกับเงินได้ปกติ — ตรวจสอบกับกฎกระทรวงฉบับล่าสุดก่อนเพิ่มช่วงใหม่</p>
+          <table className="w-full text-sm">
+            <thead className="text-left text-ink-soft"><tr><th className="pb-1 font-medium">มีผลตั้งแต่</th><th className="pb-1 font-medium">วงเงิน (บาท)</th><th className="pb-1 font-medium">ไม่เกินค่าจ้าง (วัน)</th><th className="w-8" /></tr></thead>
+            <tbody>
+              {exemptions.map((r, i) => (
+                <tr key={i}>
+                  <td className="py-1 pr-2"><Input type="date" className="h-9" value={r.from} onChange={(e) => setEx(exemptions.map((x, j) => (j === i ? { ...x, from: e.target.value } : x)))} /></td>
+                  <td className="py-1 pr-2"><Input type="number" className="num h-9" value={r.max_amount} onChange={(e) => setEx(exemptions.map((x, j) => (j === i ? { ...x, max_amount: Number(e.target.value) } : x)))} /></td>
+                  <td className="py-1 pr-2"><Input type="number" className="num h-9" value={r.max_days} onChange={(e) => setEx(exemptions.map((x, j) => (j === i ? { ...x, max_days: Number(e.target.value) } : x)))} /></td>
+                  <td><button type="button" aria-label="ลบช่วง" className="p-1 text-ink-mute hover:text-rust" onClick={() => setEx(exemptions.filter((_, j) => j !== i))}><Trash2 className="size-4" /></button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <Button size="sm" variant="ghost" icon={<Plus className="size-4" />} onClick={() => setEx([...exemptions, { from: new Date().toISOString().slice(0, 10), max_amount: 0, max_days: 0 }])}>เพิ่มช่วง</Button>
         </Panel>
         <Panel title="บัญชีบริษัทและไฟล์โอนเงิน">
           <div className="grid gap-4 sm:grid-cols-2">

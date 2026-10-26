@@ -60,7 +60,8 @@ export default function LeaveTypesPage() {
 
           { name: "is_paid", label: "ได้รับค่าจ้างระหว่างลา", type: "boolean", section: "ค่าจ้าง" },
           { name: "pay_rate_percent", label: "อัตราค่าจ้างระหว่างลา (%)", type: "number", step: "0.01", min: 0, max: 100, section: "ค่าจ้าง", hidden: (v) => !v.is_paid },
-          { name: "paid_days_limit", label: "จ่ายค่าจ้างไม่เกิน (วัน/ปี)", type: "number", step: "0.5", min: 0, section: "ค่าจ้าง", hidden: (v) => !v.is_paid, hint: "เช่น ลาป่วยได้ค่าจ้าง 30 วัน, ลาคลอด 60 วัน — เว้นว่าง = ไม่จำกัด" },
+          { name: "paid_days_limit", label: "จ่ายค่าจ้างไม่เกิน (วัน)", type: "number", step: "0.5", min: 0, section: "ค่าจ้าง", hidden: (v) => !v.is_paid, hint: "เช่น ลาป่วยได้ค่าจ้าง 30 วัน, ลาคลอด 60 วัน — เว้นว่าง = ไม่จำกัด" },
+          { name: "paid_limit_scope", label: "นับเพดานค่าจ้าง", type: "select", section: "ค่าจ้าง", default: "year", hidden: (v) => !v.is_paid || !v.paid_days_limit, options: [{ value: "year", label: "ต่อปีปฏิทิน" }, { value: "episode", label: "ต่อครั้ง (เช่น ลาคลอดต่อการตั้งครรภ์)" }], hint: "ต่อครั้ง: วันลาประเภทนี้ที่ห่างกันเกิน 270 วันนับเป็นครั้งใหม่ — ลาคร่อมปีไม่ได้เพดานใหม่" },
 
           { name: "allow_full_day", label: "ลาเต็มวันได้", type: "boolean", section: "การยื่นลา" },
           { name: "allow_half_day", label: "ลาครึ่งวันได้", type: "boolean", section: "การยื่นลา" },

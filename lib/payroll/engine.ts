@@ -72,6 +72,8 @@ export interface LineInput {
   note?: string | null;
   source?: string;
   source_id?: number | null;
+  /** count as irregular income for the tax projection even if the pay item is regular (retro pay of earlier months) */
+  irregular?: boolean;
 }
 
 export interface EmployeePayInput {
@@ -170,18 +172,20 @@ export function computeEntry(input: EmployeePayInput): EntryResult {
     if (!it) return;
     const a = rm(amount);
     if (!a) return;
+    // a negative amount reverses the item (e.g. "ยกเลิกสวัสดิการ" after payment, retro refund of a deduction):
+    // keep the amount positive and flip the direction, so it is taken back instead of paid again
     lines.push({
       pay_item_id: it.id,
       code: it.code,
       name: opts.name ?? it.name,
       category: it.category,
-      direction: it.direction,
+      direction: a < 0 ? (-it.direction as 1 | -1) : it.direction,
       qty: opts.qty ?? null,
       rate: opts.rate ?? null,
       amount: Math.abs(a),
       is_taxable: it.is_taxable,
       is_sso: it.is_sso,
-      is_regular: it.is_regular,
+      is_regular: opts.is_regular ?? it.is_regular,
       is_pvd_base: it.is_pvd_base,
       source: opts.source ?? "auto",
       source_id: opts.source_id ?? null,
@@ -261,7 +265,7 @@ export function computeEntry(input: EmployeePayInput): EntryResult {
     if (l.item.calc_type === "per_day") amount = amount * (l.qty ?? att.work_days);
     else if (l.item.calc_type === "per_hour") amount = amount * (l.qty ?? att.work_minutes / 60);
     else if (l.item.calc_type === "percent_salary") amount = (salary * (l.item.rate ?? amount)) / 100;
-    push(l.item, amount, { qty: l.qty ?? null, source: l.source ?? source, source_id: l.source_id ?? null, name: l.note ? `${l.item.name} — ${l.note}` : undefined });
+    push(l.item, amount, { qty: l.qty ?? null, source: l.source ?? source, source_id: l.source_id ?? null, name: l.note ? `${l.item.name} — ${l.note}` : undefined, is_regular: l.irregular ? false : undefined });
   };
   if (period.include_constants) input.constants.forEach((l) => lineFrom(l, "constant"));
   input.adjustments.forEach((l) => lineFrom(l, l.source ?? "manual"));

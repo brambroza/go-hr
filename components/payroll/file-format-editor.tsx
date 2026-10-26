@@ -14,7 +14,7 @@ import { ENCODING_LABEL, type Encoding } from "@/lib/payroll/tis620";
 import { FilePreview, IssueList, StatusBadge, useFileLayouts } from "./file-export";
 import { loadPeriods, loadPreviewData, type PeriodLite } from "./file-preview-data";
 
-const KINDS: FileKind[] = ["bank", "sso", "pnd1", "pnd1a", "rd_fund"];
+const KINDS: FileKind[] = ["bank", "sso", "pnd1", "pnd1a", "rd_fund", "pvd"];
 type Section = "header" | "detail" | "trailer";
 const SECTION_LABEL: Record<Section, string> = { header: "ส่วนหัว (Header)", detail: "รายการ (Detail) — 1 บรรทัดต่อคน", trailer: "ส่วนท้าย (Trailer)" };
 const TYPE_LABEL: Record<FieldDef["type"], string> = { text: "ข้อความ", digits: "ตัวเลขล้วน (ตัดขีด)", int: "จำนวนเต็ม", amount: "จำนวนเงิน มีจุดทศนิยม", satang: "จำนวนเงินเป็นสตางค์ (ไม่มีจุด)", date: "วันที่" };

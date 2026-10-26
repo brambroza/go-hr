@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BarChart3, CalendarCheck, Clock, FileText, Landmark, Receipt, ShieldCheck, Users } from "lucide-react";
+import { BarChart3, CalendarCheck, Clock, FileText, Landmark, PiggyBank, Receipt, ShieldCheck, UserCheck, Users } from "lucide-react";
 import { requirePerm } from "@/lib/auth";
 import { PageHeader } from "@/components/ui";
 
@@ -11,6 +11,8 @@ const GROUPS = [
     items: [
       { href: "/reports/pnd1", icon: Landmark, title: "ภ.ง.ด.1 / ภ.ง.ด.1ก", desc: "ภาษีหัก ณ ที่จ่ายรายเดือนพร้อมใบแนบ และสรุปทั้งปี ส่งออกไฟล์สำหรับโปรแกรม RD Prep / e-Filing" },
       { href: "/reports/sso", icon: ShieldCheck, title: "สปส.1-10", desc: "แบบรายการแสดงการส่งเงินสมทบรายเดือนแยกสาขา ส่วนที่ 1 และ 2 พร้อมไฟล์ส่งข้อมูล e-Service" },
+      { href: "/reports/pvd", icon: PiggyBank, title: "กองทุนสำรองเลี้ยงชีพ", desc: "เงินสะสมและเงินสมทบรายคนต่อเดือน พร้อมไฟล์นำส่งบริษัทจัดการกองทุน (ปรับรูปแบบไฟล์ได้)" },
+      { href: "/reports/sso-register", icon: UserCheck, title: "สปส.1-03 / 6-09 แจ้งเข้า-แจ้งออก", desc: "พนักงานเข้าใหม่และพ้นสภาพรายเดือน พร้อมกำหนดยื่น ตรวจข้อมูลที่ขาด ส่งออก CSV และพิมพ์แบบฟอร์ม" },
       { href: "/reports/tawi50", icon: Receipt, title: "หนังสือรับรองการหักภาษี 50 ทวิ", desc: "ออกหนังสือรับรองฯ ประจำปีให้พนักงานทุกคน พิมพ์ทีละคนหรือทั้งหมด" },
     ],
   },

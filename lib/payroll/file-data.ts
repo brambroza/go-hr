@@ -231,6 +231,79 @@ export function ssoFileData(b: SsoBatch, rows: SsoRow[]): { data: FileData; issu
   return { data: { file, rows: out }, issues };
 }
 
+// ================================================================================================ PVD
+export interface PvdRow {
+  employee_id: number;
+  emp_code: string;
+  member_no: string | null;
+  national_id: string | null;
+  prefix: string | null;
+  first_name: string;
+  last_name: string;
+  wage: number;
+  employee_rate: number;
+  employer_rate: number;
+  employee: number;
+  employer: number;
+}
+
+export interface PvdBatch {
+  company: { name: string; name_en?: string; tax_id: string };
+  period_code: string;
+  pay_date: string;
+  year: number;
+  month: number;
+  fund_name?: string;
+  employer_code?: string;
+}
+
+export function pvdFileData(b: PvdBatch, rows: PvdRow[]): { data: FileData; issues: Issue[] } {
+  const issues: Issue[] = [];
+  const out: Vars[] = [];
+  rows.forEach((r, i) => {
+    const who = `${r.emp_code} ${r.first_name} ${r.last_name}`;
+    const id = digits(r.national_id);
+    if (!id) issues.push({ level: "error", message: `${who}: ไม่มีเลขประจำตัวประชาชน`, row: i });
+    else if (!validNationalId(id)) issues.push({ level: "warn", message: `${who}: เลข ${id} หลักตรวจสอบไม่ถูกต้อง`, row: i });
+    if (!r.member_no) issues.push({ level: "warn", message: `${who}: ยังไม่มีเลขที่สมาชิกกองทุน (ข้อมูลพนักงาน > เงินเดือน)`, row: i });
+    if (r.employee < 0 || r.employer < 0) issues.push({ level: "error", message: `${who}: เงินสะสม/สมทบติดลบ`, row: i });
+    const expEmp = r2((r.wage * r.employee_rate) / 100);
+    if (r.wage > 0 && Math.abs(expEmp - r.employee) > 1) issues.push({ level: "warn", message: `${who}: เงินสะสม ${r.employee.toFixed(2)} ไม่เท่ากับ ${r.employee_rate}% × ${r.wage.toFixed(2)} (ปัดเศษหรือมีหลายงวดในเดือน)`, row: i });
+    out.push({
+      "employee.code": r.emp_code,
+      "member.no": r.member_no ?? "",
+      "member.national_id": id,
+      "member.prefix": (r.prefix ?? "").trim(),
+      "member.first_name": r.first_name.trim(),
+      "member.last_name": r.last_name.trim(),
+      "member.wage": r2(r.wage),
+      "member.employee_rate": r.employee_rate,
+      "member.employer_rate": r.employer_rate,
+      "member.employee": r2(r.employee),
+      "member.employer": r2(r.employer),
+    });
+  });
+  const te = sum(rows, (r) => r.employee);
+  const tr = sum(rows, (r) => r.employer);
+  const file: Vars = {
+    "company.name": b.company.name,
+    "company.name_en": b.company.name_en ?? "",
+    "company.tax_id": digits(b.company.tax_id),
+    "period.code": b.period_code,
+    "period.pay_date": b.pay_date,
+    today: new Date().toISOString().slice(0, 10),
+    "pvd.fund_name": b.fund_name ?? "",
+    "pvd.employer_code": b.employer_code ?? "",
+    "pvd.wage_month": `${b.year}-${String(b.month).padStart(2, "0")}-01`,
+    "pvd.count": rows.length,
+    "pvd.total_wage": sum(rows, (r) => r.wage),
+    "pvd.total_employee": te,
+    "pvd.total_employer": tr,
+    "pvd.total": r2(te + tr),
+  };
+  return { data: { file, rows: out }, issues };
+}
+
 // ================================================================================================ RD
 export interface RdRow {
   employee_id: number;

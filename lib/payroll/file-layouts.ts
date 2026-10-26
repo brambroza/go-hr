@@ -83,6 +83,28 @@ export const VARIABLES: Record<FileKind, VarDef[]> = {
   pnd1: [] as VarDef[],
   pnd1a: [] as VarDef[],
   rd_fund: [] as VarDef[],
+  pvd: [
+    ...COMMON_FILE,
+    v("pvd.fund_name", "ชื่อกองทุน (ตั้งค่า เงินเดือน)", "file"),
+    v("pvd.employer_code", "รหัสนายจ้าง / รหัสบริษัทที่บริษัทจัดการกำหนด", "file"),
+    v("pvd.wage_month", "งวดค่าจ้าง (วันที่ 1 ของเดือน)", "file", "2026-09-01"),
+    v("pvd.count", "จำนวนสมาชิก", "file"),
+    v("pvd.total_wage", "ค่าจ้างที่ใช้คำนวณรวม", "file"),
+    v("pvd.total_employee", "เงินสะสมรวม (ลูกจ้าง)", "file"),
+    v("pvd.total_employer", "เงินสมทบรวม (นายจ้าง)", "file"),
+    v("pvd.total", "รวมเงินนำส่ง", "file"),
+    v("employee.code", "รหัสพนักงาน", "row"),
+    v("member.no", "เลขที่สมาชิกกองทุน", "row"),
+    v("member.national_id", "เลขประจำตัวประชาชน", "row"),
+    v("member.prefix", "คำนำหน้า", "row"),
+    v("member.first_name", "ชื่อ", "row"),
+    v("member.last_name", "นามสกุล", "row"),
+    v("member.wage", "ค่าจ้างที่ใช้คำนวณ", "row", "30000.00"),
+    v("member.employee_rate", "อัตราเงินสะสม (%)", "row", "5"),
+    v("member.employer_rate", "อัตราเงินสมทบ (%)", "row", "5"),
+    v("member.employee", "เงินสะสม (ลูกจ้าง)", "row", "1500.00"),
+    v("member.employer", "เงินสมทบ (นายจ้าง)", "row", "1500.00"),
+  ],
 };
 
 const RD_FILE: VarDef[] = [
@@ -151,6 +173,7 @@ export const KIND_LABEL: Record<FileKind, string> = {
   pnd1: "ไฟล์ ภ.ง.ด.1 (รายเดือน)",
   pnd1a: "ไฟล์ ภ.ง.ด.1ก (ประจำปี)",
   rd_fund: "ไฟล์ข้อมูลกองทุน (แนบ ภ.ง.ด.1ก)",
+  pvd: "ไฟล์นำส่งกองทุนสำรองเลี้ยงชีพ",
 };
 
 export const STATUS_LABEL: Record<FileLayout["status"], string> = {
@@ -394,6 +417,39 @@ const RD_FUND: FileLayout = {
     F.a("FUNDGPF กบข./กสจ./กองทุนสงเคราะห์ครู", "fund.gpf", 16),
     F.a("FUNDSSO กองทุนประกันสังคม", "fund.sso", 16),
     F.a("FUNDPVD กองทุนสำรองเลี้ยงชีพ", "fund.pvd", 16),
+  ],
+};
+
+// =========================================================================================== กองทุนสำรองเลี้ยงชีพ
+// Each fund manager (บลจ.) has its own upload template, so the built-in layout is a plain CSV with every column HR
+// usually needs; clone it in /settings/file-formats to match the fund manager's template.
+const PVD_GENERIC: FileLayout = {
+  key: "pvd_generic_csv",
+  kind: "pvd",
+  label: "CSV ทั่วไป — เงินสะสม / เงินสมทบรายคน",
+  description: "ใช้ส่งบริษัทจัดการกองทุน หรือคัดลอกลง Template ของบริษัทจัดการ",
+  status: "unverified",
+  source: "รูปแบบของ GO HR (ไม่ใช่สเปกของบริษัทจัดการกองทุน) — ยืนยันกับบริษัทจัดการก่อนส่งครั้งแรก",
+  mode: "delimited",
+  delimiter: ",",
+  quote: true,
+  columnTitles: true,
+  encoding: "utf8bom",
+  lineEnding: "CRLF",
+  fileName: "pvd-{period.code}.csv",
+  detail: [
+    F.seq("ลำดับ"),
+    F.t("รหัสพนักงาน", "employee.code"),
+    F.t("เลขที่สมาชิก", "member.no"),
+    F.d("เลขประจำตัวประชาชน", "member.national_id", 13, { required: true }),
+    F.t("คำนำหน้า", "member.prefix"),
+    F.t("ชื่อ", "member.first_name", undefined, { required: true }),
+    F.t("นามสกุล", "member.last_name", undefined, { required: true }),
+    F.a("ค่าจ้าง", "member.wage"),
+    F.a("อัตราสะสม %", "member.employee_rate"),
+    F.a("อัตราสมทบ %", "member.employer_rate"),
+    F.a("เงินสะสม", "member.employee"),
+    F.a("เงินสมทบ", "member.employer"),
   ],
 };
 
@@ -689,6 +745,7 @@ export const BUILTIN_LAYOUTS: FileLayout[] = [
   rdPrep("pnd1a"),
   rdV1("pnd1a"),
   RD_FUND,
+  PVD_GENERIC,
 ];
 
 /** legacy keys stored in settings payroll.bank_file_format → built-in layout keys */

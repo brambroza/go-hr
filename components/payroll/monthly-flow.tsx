@@ -58,6 +58,7 @@ export function MonthlyFlow() {
       case "payslip": return [{ href: p ? `/payroll/${p.id}/payslips` : "/payroll", label: "สลิปเงินเดือน" }];
       case "sso": return [{ href: `/reports/sso?${q}`, label: "สปส.1-10 และไฟล์ e-Service" }];
       case "pnd1": return [{ href: `/reports/pnd1?${q}`, label: "ภ.ง.ด.1 และไฟล์ e-Filing" }];
+      case "pvd": return [{ href: `/reports/pvd?${q}`, label: "รายการและไฟล์นำส่งกองทุน" }];
       case "pnd1a": return [{ href: `/reports/pnd1?mode=pnd1a&year=${ym.year}`, label: "ภ.ง.ด.1ก" }, { href: `/reports/tawi50?year=${ym.year}`, label: "50 ทวิ" }];
       default: return [];
     }
@@ -192,7 +193,7 @@ export function MonthlyFlow() {
           year={ym.year}
           month={ym.month}
           today={data.today}
-          suggested={filingStep.filingKind === "bank" ? p?.net_total : filingStep.filingKind === "pnd1" ? p?.tax_total : filingStep.filingKind === "sso" && p ? p.sso_total * 2 : undefined}
+          suggested={filingStep.filingKind === "bank" ? p?.net_total : filingStep.filingKind === "pnd1" ? p?.tax_total : filingStep.filingKind === "sso" && p ? p.sso_total * 2 : filingStep.filingKind === "pvd" ? p?.pvd_total : undefined}
           onClose={() => setFilingStep(null)}
           onSaved={() => {
             setFilingStep(null);

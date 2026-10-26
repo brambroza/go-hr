@@ -13,7 +13,7 @@
 
 import { byteLength, encodeText, toTis620Text, truncateBytes, type Encoding } from "./tis620";
 
-export type FileKind = "bank" | "sso" | "pnd1" | "pnd1a" | "rd_fund";
+export type FileKind = "bank" | "sso" | "pnd1" | "pnd1a" | "rd_fund" | "pvd";
 export type FieldType = "text" | "digits" | "int" | "amount" | "satang" | "date";
 
 export interface FieldDef {

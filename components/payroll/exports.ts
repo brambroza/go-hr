@@ -10,14 +10,21 @@ import type { Entry, EntryItem, PeriodFull } from "./types";
 export async function exportRegister(period: PeriodFull, entries: Entry[], orgName: (id: number | null) => string) {
   const sb = supabaseBrowser();
   const items = await fetchRowsIn<EntryItem>(entries.map((e) => e.id), (part) => sb.from("payroll_entry_items").select("entry_id, code, name, direction, amount, sort_order, id").in("entry_id", part).order("id"));
-  // one column per pay item code (income first, then deductions)
-  const cols = new Map<string, { name: string; dir: number }>();
-  for (const i of items) if (i.code && !cols.has(i.code)) cols.set(i.code, { name: i.name.replace(/ — .*$/, "").replace(/ \(.*\)$/, ""), dir: i.direction });
-  const order = [...cols.entries()].sort((a, b) => b[1].dir - a[1].dir);
+  // one column per pay item code (income first, then deductions). A column takes the direction most of its lines have;
+  // a reversed line (e.g. "ยกเลิกสวัสดิการ", retro refund) shows as a negative amount in that column
+  const cols = new Map<string, { name: string; votes: number }>();
+  for (const i of items) {
+    if (!i.code) continue;
+    const c = cols.get(i.code) ?? { name: i.name.replace(/ — .*$/, "").replace(/ \(.*\)$/, ""), votes: 0 };
+    c.votes += Number(i.direction);
+    cols.set(i.code, c);
+  }
+  const dirOf = (code: string) => ((cols.get(code)?.votes ?? 1) >= 0 ? 1 : -1);
+  const order = [...cols.keys()].map((c) => [c, { name: cols.get(c)!.name, dir: dirOf(c) }] as const).sort((a, b) => b[1].dir - a[1].dir);
   const byEntry = new Map<number, Map<string, number>>();
   for (const i of items) {
     const m = byEntry.get(i.entry_id) ?? new Map<string, number>();
-    m.set(i.code ?? "", (m.get(i.code ?? "") ?? 0) + Number(i.amount));
+    m.set(i.code ?? "", (m.get(i.code ?? "") ?? 0) + Number(i.amount) * Number(i.direction) * dirOf(i.code ?? ""));
     byEntry.set(i.entry_id, m);
   }
   const header = ["รหัส", "ชื่อ-สกุล", "หน่วยงาน", "ตำแหน่ง", "ฐานเงินเดือน", "วันทำงาน", "ขาด", "ลาไม่รับค่าจ้าง", ...order.map(([c, v]) => `${v.dir === 1 ? "+" : "-"}${v.name} (${c})`), "รวมรายได้", "รวมรายการหัก", "เงินได้สุทธิ", "สปส.นายจ้าง", "PVD นายจ้าง", "ช่องทางจ่าย"];

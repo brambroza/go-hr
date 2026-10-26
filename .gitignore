@@ -46,3 +46,6 @@ next-env.d.ts
 /supabase/.temp
 /licenses/private*
 /deploy/supabase
+
+# backup settings of a customer server (paths of the passphrase file, offsite target)
+deploy/backup.env

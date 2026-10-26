@@ -32,7 +32,10 @@ export const PENDING_SOURCE_LABEL: Record<string, string> = {
   petty_cash: "เงินสดย่อย",
   retro: "ตกเบิก",
   severance: "ค่าชดเชย",
+  severance_exempt: "ค่าชดเชย (ยกเว้นภาษี)",
   leave_payout: "จ่ายคืนวันลา",
+  notice_pay: "ค่าบอกกล่าวล่วงหน้า",
+  guarantee_refund: "คืนเงินประกัน",
   final_settlement: "เคลียร์เงินพ้นสภาพ",
   manual: "บันทึกเอง",
 };

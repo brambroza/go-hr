@@ -111,3 +111,25 @@ test("roundMoney: satang keeps 2 decimals, baht rounds half up", () => {
   assert.equal(roundMoney(12.5, "baht"), 13);
   assert.equal(roundMoney(12.49, undefined), 12.49);
 });
+
+test("a negative adjustment takes money back instead of paying it again (welfare revert, retro)", () => {
+  const welfare = mk("WELFARE", "welfare", 1, { category: "welfare", is_taxable: false });
+  const plain = computeEntry(base());
+  const r = computeEntry(base({ adjustments: [{ item: welfare, amount: -500, source: "welfare_revert", source_id: 3 }] }));
+  const line = r.lines.find((l) => l.code === "WELFARE")!;
+  assert.equal(line.direction, -1);
+  assert.equal(line.amount, 500);
+  assert.equal(r.net_pay, plain.net_pay - 500);
+  // a negative deduction (e.g. retro refund of an absence deduction) becomes income, still counted in the SSO / tax base
+  const refund = computeEntry(base({ adjustments: [{ item: items.absent, amount: -1000, source: "retro" }] }));
+  const abs = refund.lines.find((l) => l.code === "ABSENT")!;
+  assert.equal(abs.direction, 1);
+  assert.equal(refund.taxable_income, plain.taxable_income + 1000);
+});
+
+test("retro lines on a regular item count as irregular income for the tax projection", () => {
+  const r = computeEntry(base({ adjustments: [{ item: items.salary, amount: 2000, source: "retro", irregular: true }] }));
+  const retro = r.lines.find((l) => l.source === "retro")!;
+  assert.equal(retro.is_regular, false);
+  assert.equal(r.detail.irregular_taxable, 2000);
+});

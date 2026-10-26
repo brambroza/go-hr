@@ -102,3 +102,13 @@ test("parseOrg checks references across the file and orders parents first", asyn
   assert.match(r.rows[5].errors.join(), /ประเภทข้อมูล/);
   assert.deepEqual(orgSaveOrder(r.rows.slice(0, 4)).map((x) => x.code), ["HQ", "PRD", "L1", "OP"]);
 });
+
+test("monthly flow: PVD step only when the period has PVD contributions; due 3 days after pay date", () => {
+  const without = buildMonthlyFlow(input({}));
+  assert.ok(!without.some((s) => s.key === "pvd"));
+  const withPvd = buildMonthlyFlow(input({ period: period({ pvd_total: 12000 }) }));
+  const step = withPvd.find((s) => s.key === "pvd");
+  assert.ok(step);
+  assert.equal(step!.filingKind, "pvd");
+  assert.equal(step!.due, "2026-10-03");
+});

@@ -34,19 +34,20 @@ export async function monthlyFlowAction(year: number, month: number): Promise<Ac
 
     let period: FlowPeriod | null = null;
     if (main) {
-      let net = 0, tax = 0, sso = 0, n = 0;
+      let net = 0, tax = 0, sso = 0, pvd = 0, n = 0;
       for (let from = 0; ; from += 1000) {
-        const { data, error: e } = await sb.from("payroll_entries").select("net_pay, tax, sso_employee").eq("period_id", main.id).order("id").range(from, from + 999);
+        const { data, error: e } = await sb.from("payroll_entries").select("net_pay, tax, sso_employee, pvd_employee, pvd_employer").eq("period_id", main.id).order("id").range(from, from + 999);
         if (e) throw new Error(e.message);
         for (const r of data ?? []) {
           net += Number(r.net_pay) || 0;
           tax += Number(r.tax) || 0;
           sso += Number(r.sso_employee) || 0;
+          pvd += (Number(r.pvd_employee) || 0) + (Number(r.pvd_employer) || 0);
         }
         n += data?.length ?? 0;
         if (!data || data.length < 1000) break;
       }
-      period = { ...(main as unknown as FlowPeriod), entries: n, net_total: Math.round(net * 100) / 100, tax_total: Math.round(tax * 100) / 100, sso_total: Math.round(sso * 100) / 100 };
+      period = { ...(main as unknown as FlowPeriod), entries: n, net_total: Math.round(net * 100) / 100, tax_total: Math.round(tax * 100) / 100, sso_total: Math.round(sso * 100) / 100, pvd_total: Math.round(pvd * 100) / 100 };
     }
 
     const from = main?.att_start_date ?? main?.start_date ?? `${year}-${String(month).padStart(2, "0")}-01`;

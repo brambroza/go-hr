@@ -2,7 +2,9 @@
 //
 // Rules (Thai Labour Protection Act + leave_types configuration):
 //   * is_paid = false                     → every leave day is unpaid
-//   * paid_days_limit > 0                 → only the first N days in the calendar year are paid; the rest is unpaid
+//   * paid_days_limit > 0                 → only the first N days are paid; the rest is unpaid. Counted per calendar year,
+//                                           or per episode (paid_limit_scope = 'episode', e.g. ลาคลอด: 60 paid days per
+//                                           pregnancy even when the leave runs from December into January)
 //   * paid_days_limit null / 0 (is_paid)  → no cap
 //   * pay_rate_percent < 100              → the paid days are paid at that rate; the remainder (100 - rate)% is unpaid
 // The cap is counted over all approved leave of that type in the calendar year in date order, so a period only
@@ -13,7 +15,12 @@ export interface LeaveTypeRule {
   paid_days_limit: number | null;
   pay_rate_percent: number;
   name?: string;
+  /** 'year' (default) = cap per calendar year · 'episode' = cap per run of leave; a gap over EPISODE_GAP_DAYS starts a new one */
+  paid_limit_scope?: "year" | "episode";
 }
+
+/** two maternity leaves more than ~9 months apart cannot belong to the same pregnancy */
+export const EPISODE_GAP_DAYS = 270;
 
 /** one leave day (or fraction of a day) taken by one employee */
 export interface LeaveDay {
@@ -33,13 +40,21 @@ const r4 = (n: number) => Math.round(n * 10000) / 10000;
 export function computeLeavePay(days: LeaveDay[], types: Record<number, LeaveTypeRule>, from: string, to: string): LeavePayResult {
   const res: LeavePayResult = { paid_leave_days: 0, unpaid_leave_days: 0, by_type: {} };
   const sorted = [...days].sort((a, b) => a.date.localeCompare(b.date));
-  const used: Record<string, number> = {}; // `${year}|${type}` → paid-cap days used
+  const used: Record<string, number> = {}; // `${year}|${type}` or `ep${n}|${type}` → paid-cap days used
+  const episode: Record<number, { n: number; last: string }> = {};
   for (const d of sorted) {
     if (d.date > to) break;
     const t = types[d.leave_type_id];
     const amount = Number(d.days) || 0;
     if (!t || amount <= 0) continue;
-    const key = `${d.date.slice(0, 4)}|${d.leave_type_id}`;
+    let key = `${d.date.slice(0, 4)}|${d.leave_type_id}`;
+    if (t.paid_limit_scope === "episode") {
+      const ep = episode[d.leave_type_id];
+      const gap = ep ? (Date.parse(d.date) - Date.parse(ep.last)) / 86_400_000 : Infinity;
+      const n = !ep ? 1 : gap > EPISODE_GAP_DAYS ? ep.n + 1 : ep.n;
+      episode[d.leave_type_id] = { n, last: d.date };
+      key = `ep${n}|${d.leave_type_id}`;
+    }
     const cap = t.is_paid ? (t.paid_days_limit && t.paid_days_limit > 0 ? Number(t.paid_days_limit) : Infinity) : 0;
     const before = used[key] ?? 0;
     const capped = Math.max(0, Math.min(amount, cap - before)); // days still within the paid cap

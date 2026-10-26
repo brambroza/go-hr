@@ -82,3 +82,20 @@ test("loan: flat interest totals and schedule", () => {
 });
 
 // export file builders (bank / SSO / RD) are tested in tests/payroll-files.test.ts
+
+test("leave pay: maternity paid cap is per pregnancy, not per calendar year", () => {
+  const rules: Record<number, LeaveTypeRule> = { 9: { is_paid: true, paid_days_limit: 60, pay_rate_percent: 100, name: "ลาคลอด", paid_limit_scope: "episode" } };
+  // 120 days from 2026-11-01: 61 days in Nov–Dec, 59 days in Jan–Feb
+  const days = Array.from({ length: 120 }, (_, i) => ({ date: new Date(Date.UTC(2026, 10, 1 + i)).toISOString().slice(0, 10), days: 1, leave_type_id: 9 }));
+  const jan = computeLeavePay(days, rules, "2027-01-01", "2027-01-31");
+  assert.equal(jan.paid_leave_days, 0); // the 60 paid days were used up in Nov–Dec
+  assert.equal(jan.unpaid_leave_days, 31);
+  const dec = computeLeavePay(days, rules, "2026-12-01", "2026-12-31");
+  assert.equal(dec.paid_leave_days, 30);
+  // per calendar year (old behaviour) would have paid January again
+  const yearly = computeLeavePay(days, { 9: { ...rules[9], paid_limit_scope: "year" } }, "2027-01-01", "2027-01-31");
+  assert.equal(yearly.paid_leave_days, 31);
+  // a second pregnancy a year later gets a new cap
+  const next = [...days, ...Array.from({ length: 10 }, (_, i) => ({ date: `2028-03-${String(i + 1).padStart(2, "0")}`, days: 1, leave_type_id: 9 }))];
+  assert.equal(computeLeavePay(next, rules, "2028-03-01", "2028-03-31").paid_leave_days, 10);
+});

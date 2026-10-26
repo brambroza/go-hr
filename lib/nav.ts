@@ -92,6 +92,8 @@ export const NAV: NavGroup[] = [
       { href: "/payroll/salary", label: "ปรับเงินเดือน", perm: ["employee_private", "edit"] },
       { href: "/payroll/loans", label: "ภาระหนี้สินพนักงาน", perm: ["payroll"] },
       { href: "/payroll/advances", label: "เบิกล่วงหน้า", perm: ["payroll"] },
+      { href: "/payroll/settlements", label: "เคลียร์เงินพนักงานพ้นสภาพ", perm: ["payroll"] },
+      { href: "/payroll/retro", label: "ตกเบิก", perm: ["payroll"] },
       { href: "/payroll/commissions", label: "ค่าคอมมิชชั่น", perm: ["payroll"] },
       { href: "/payroll/items", label: "ประเภทรายรับรายจ่าย", perm: ["payroll"] },
       { href: "/payroll/welfare", label: "สวัสดิการ", perm: ["payroll"] },

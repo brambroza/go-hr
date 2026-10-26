@@ -16,7 +16,9 @@ const COPIES = {
 
 /** หนังสือรับรองการหักภาษี ณ ที่จ่าย ตามมาตรา 50 ทวิ — official layout, copies 1 and 2 per employee, bulk print */
 export default function Tawi50Page() {
-  const qy = Number(useSearchParams().get("year"));
+  const params = useSearchParams();
+  const qy = Number(params.get("year"));
+  const onlyEmp = Number(params.get("emp")) || null; // from the final settlement page: one leaver
   const [year, setYear] = useState(qy >= 2000 && qy <= 2100 ? qy : new Date().getMonth() < 3 ? new Date().getFullYear() - 1 : new Date().getFullYear());
   const [rows, setRows] = useState<TaxRow[] | null>(null);
   const [q, setQ] = useState("");
@@ -40,11 +42,14 @@ export default function Tawi50Page() {
 
   const shown = useMemo(() => {
     const t = q.trim().toLowerCase();
-    return (rows ?? []).filter((r) => !t || `${r.emp?.code} ${r.emp?.first_name} ${r.emp?.last_name}`.toLowerCase().includes(t));
-  }, [rows, q]);
+    // filter here (not in the loader) so the certificate number stays the same as in the full print run
+    return (rows ?? []).filter((r) => (!onlyEmp || r.employee_id === onlyEmp) && (!t || `${r.emp?.code} ${r.emp?.first_name} ${r.emp?.last_name}`.toLowerCase().includes(t)));
+  }, [rows, q, onlyEmp]);
   const hq = info?.branches.find((b) => b.is_head_office);
   const today = new Date().toISOString().slice(0, 10);
-  const issueDate = `${year}-12-31` < today ? today : `${year}-12-31`;
+  const yearEnd = `${year}-12-31` < today ? today : `${year}-12-31`;
+  // someone who left during the year gets the certificate with the final pay (date of the last payment), not on 31 Dec
+  const issueDateOf = (r: TaxRow) => (r.emp?.resign_date && r.emp.resign_date.slice(0, 4) === String(year) && r.last_pay_date ? r.last_pay_date : yearEnd);
   const docNo = (r: TaxRow) => String((rows ?? []).indexOf(r) + 1).padStart(4, "0");
   const copyList = copies === "both" ? (["1", "2"] as const) : ([copies] as const);
 
@@ -102,7 +107,7 @@ export default function Tawi50Page() {
                 year={year}
                 bookNo={bookNo}
                 docNo={docNo(r)}
-                issueDate={issueDate}
+                issueDate={issueDateOf(r)}
                 payer={{ name: info?.company.name ?? "", tax_id: info?.company.tax_id ?? "", address: hq?.address || info?.company.address || "" }}
               />
             )),

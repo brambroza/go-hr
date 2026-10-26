@@ -58,8 +58,15 @@ sudo deploy/install.sh \
 
 ## 5. งานประจำของผู้ดูแลระบบ
 - สำรองข้อมูลทุกคืน: `sudo crontab -e` แล้วเพิ่ม `30 1 * * * /opt/gohr/deploy/backup.sh >> /var/log/gohr-backup.log 2>&1`
-  (เก็บที่ `/var/backups/gohr` 30 วัน — ควรคัดลอกออกนอกเครื่องด้วย)
-- กู้คืนฐานข้อมูล: `docker exec -i supabase-db pg_restore -U supabase_admin -d postgres --clean --if-exists < db-YYYYMMDD-HHMM.dump`
+  - ตั้งค่าที่ `deploy/backup.env` (คัดลอกจาก `deploy/backup.env.example`, `chmod 600`)
+  - **ต้องตั้ง `BACKUP_OFFSITE` ก่อนส่งมอบ** ให้มีสำเนานอกเครื่อง เช่น `rclone:<remote>:<path>` (S3 / Google Drive / OneDrive),
+    `user@nas:/path` (rsync ผ่าน SSH) หรือดิสก์ที่ mount ไว้ — สำเนาบนดิสก์เดียวกันไม่ถือว่าเป็นการสำรองข้อมูล
+  - ถ้าส่งขึ้นคลาวด์ให้ตั้ง `BACKUP_PASSPHRASE_FILE` เพื่อเข้ารหัสก่อนส่ง และเก็บรหัสผ่านสำเนาที่ 2 ไว้กับผู้รับผิดชอบไอทีของลูกค้า
+  - สคริปต์ตรวจว่า dump อ่านได้ทุกครั้ง สร้าง `SHA256SUMS-<เวลา>` และเขียน `last-ok.json` ไว้ใช้ตรวจว่าสำรองล่าสุดเมื่อไร
+- **ซ้อมกู้คืน** (ไม่กระทบข้อมูลจริง แอปทำงานต่อได้): `sudo deploy/restore.sh --drill /var/backups/gohr/db-YYYYMMDD-HHMM.dump`
+  ระบบกู้คืนลงฐานข้อมูลชั่วคราวแล้วแสดงจำนวนแถวเทียบกับฐานจริง — ทำ 1 ครั้งก่อนส่งมอบและทุกครั้งที่เปลี่ยนการตั้งค่าสำรองข้อมูล บันทึกผลไว้ในเอกสารส่งมอบ
+- กู้คืนจริง: `sudo deploy/restore.sh --restore <db-...dump[.enc]> [<files-...tgz[.enc]>]` (หยุดแอป → แทนที่ฐานข้อมูล/ไฟล์แนบ → เปิดแอป,
+  ต้องพิมพ์ `RESTORE` ยืนยัน ข้อมูลที่บันทึกหลังเวลาสำรองจะหายทั้งหมด)
 - อัปเกรดเวอร์ชัน: `cd /opt/gohr && sudo git pull && sudo deploy/install.sh --domain <เดิม>` (ปรับฐานข้อมูลเฉพาะส่วนที่เพิ่มใหม่ ข้อมูลเดิมไม่หาย)
 - เวอร์ชันของ Supabase / Caddy ที่ตัวติดตั้งใช้ล็อกไว้ใน `deploy/versions.env` — ติดตั้งซ้ำกี่ครั้งก็ได้ชุดเดิม
   การอัปเกรด Supabase ต้องตั้งใจทำ: แก้ `SUPABASE_REF` → ทดสอบบน staging → สำรองข้อมูล → ลบ `deploy/supabase/docker-compose.yml` แล้วรัน `install.sh` ใหม่

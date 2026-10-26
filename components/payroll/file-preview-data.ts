@@ -5,7 +5,7 @@
 import { supabaseBrowser } from "@/lib/supabase/client";
 import { fetchRows, fetchRowsIn } from "@/lib/payroll/fetch";
 import { DEFAULT_SSO_CONFIG, ssoLimits, type SsoConfig } from "@/lib/payroll/tax";
-import { bankFileData, rdFileData, ssoFileData, type BankRow, type FileKind, type FileLayout, type Issue, type Vars } from "@/lib/payroll/files";
+import { bankFileData, pvdFileData, rdFileData, ssoFileData, type BankRow, type FileKind, type FileLayout, type Issue, type Vars } from "@/lib/payroll/files";
 
 type Entry = { employee_id: number; emp_code: string; emp_name: string; branch_id: number | null; bank_code: string | null; bank_account: string | null; pay_method: string | null; net_pay: number; taxable_income: number; tax: number; sso_wage: number; sso_employee: number; sso_employer: number; pvd_employee: number };
 type Emp = { id: number; code: string; prefix: string | null; first_name: string; last_name: string; email: string | null; phone: string | null };
@@ -66,6 +66,11 @@ export async function loadPreviewData(layout: FileLayout, period: PeriodLite): P
         return { employee_id: e.employee_id, emp_code: e.emp_code, sso_no: p?.sso_no, national_id: p?.national_id, prefix: m?.prefix ?? null, first_name: m?.first_name ?? "", last_name: m?.last_name ?? "", wage: Number(e.sso_wage), employee: Number(e.sso_employee), employer: Number(e.sso_employer) };
       }),
     );
+  }
+  if (kind === "pvd") {
+    const { loadPvdRows } = await import("@/components/reports/pvd-data");
+    const p = st.get("payroll") as { pvd_fund_name?: string; pvd_employer_code?: string } | undefined;
+    return pvdFileData({ company: comp, period_code: period.code, pay_date: period.pay_date, year: period.pay_year, month: period.pay_month, fund_name: p?.pvd_fund_name, employer_code: p?.pvd_employer_code }, await loadPvdRows([period.id]));
   }
   const rk = kind === "pnd1" ? "pnd1" : "pnd1a";
   return rdFileData(
