@@ -280,7 +280,7 @@ export default function TrainingPage() {
             <Field label="เริ่ม" required><Input type="datetime-local" value={edit.start} onChange={(e) => setEdit({ ...edit, start: e.target.value })} /></Field>
             <Field label="สิ้นสุด" required><Input type="datetime-local" value={edit.end} onChange={(e) => setEdit({ ...edit, end: e.target.value })} /></Field>
             <Field label="จำนวนชั่วโมงอบรม"><Input type="number" min={0} step="0.5" value={edit.hours} onChange={(e) => setEdit({ ...edit, hours: e.target.value })} className="num" /></Field>
-            <Field label="ค่าใช้จ่ายรวม (บาท)" hint="ระบบเฉลี่ยต่อคนลงในประวัติอบรม"><Input type="number" min={0} value={edit.cost_total} onChange={(e) => setEdit({ ...edit, cost_total: e.target.value })} className="num" /></Field>
+            <Field label="ค่าใช้จ่ายรวม (บาท)" hint="ระบบเฉลี่ยต่อคนลงในประวัติอบรม"><Input type="money" min={0} value={edit.cost_total} onChange={(e) => setEdit({ ...edit, cost_total: e.target.value })} className="num" /></Field>
             <Field label="จำนวนที่นั่ง"><Input type="number" min={1} value={edit.capacity} onChange={(e) => setEdit({ ...edit, capacity: e.target.value })} className="num" /></Field>
             <div className="pt-6"><Toggle checked={edit.is_dsd} onChange={(v) => setEdit({ ...edit, is_dsd: v })} label="ยื่นรับรองกรมพัฒนาฝีมือแรงงาน (กพร.)" /></div>
             <Field label="รายละเอียด / วัตถุประสงค์" className="sm:col-span-2"><Textarea value={edit.description} onChange={(e) => setEdit({ ...edit, description: e.target.value })} rows={3} /></Field>

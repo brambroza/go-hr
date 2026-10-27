@@ -476,7 +476,7 @@ export function RequestForm({ employeeId, defaultType, onSubmitted }: RequestFor
       {type === "advance" && (
         <>
           <Field label="จำนวนเงิน (บาท)" required>
-            <Input type="number" inputMode="decimal" min={1} className="num h-12 text-lg" value={v("amount")} onChange={(e) => set("amount", e.target.value)} />
+            <Input type="money" min={1} className="num h-12 text-lg" value={v("amount")} onChange={(e) => set("amount", e.target.value)} />
           </Field>
           <Field label="หักคืนในงวดเงินเดือน">
             <Select className="h-12" value={v("deduct_month", today.slice(0, 7))} onChange={(e) => set("deduct_month", e.target.value)}>
@@ -504,7 +504,7 @@ export function RequestForm({ employeeId, defaultType, onSubmitted }: RequestFor
             {items.map((it, i) => (
               <div key={i} className="flex gap-2">
                 <Input className="h-12 flex-1" placeholder="รายการ เช่น ค่าน้ำมัน" aria-label={`รายการที่ ${i + 1}`} value={it.desc} onChange={(e) => setItems(items.map((x, j) => (j === i ? { ...x, desc: e.target.value } : x)))} />
-                <Input className="num h-12 w-28" type="number" inputMode="decimal" placeholder="บาท" aria-label={`จำนวนเงินรายการที่ ${i + 1}`} value={it.amount} onChange={(e) => setItems(items.map((x, j) => (j === i ? { ...x, amount: e.target.value } : x)))} />
+                <Input className="num h-12 w-28" type="money" placeholder="บาท" aria-label={`จำนวนเงินรายการที่ ${i + 1}`} value={it.amount} onChange={(e) => setItems(items.map((x, j) => (j === i ? { ...x, amount: e.target.value } : x)))} />
                 {items.length > 1 && (
                   <button type="button" className="grid size-12 shrink-0 place-items-center rounded-[var(--radius-ctl)] text-ink-mute active:bg-rust-soft" aria-label="ลบรายการ" onClick={() => setItems(items.filter((_, j) => j !== i))}>
                     <Trash2 className="size-5" />
@@ -541,7 +541,7 @@ export function RequestForm({ employeeId, defaultType, onSubmitted }: RequestFor
           )}
           <div className="grid grid-cols-2 gap-3">
             <Field label="จำนวนเงิน (บาท)" required>
-              <Input type="number" inputMode="decimal" className="num h-12" value={v("amount")} onChange={(e) => set("amount", e.target.value)} />
+              <Input type="money" className="num h-12" value={v("amount")} onChange={(e) => set("amount", e.target.value)} />
             </Field>
             <Field label="วันที่เกิดค่าใช้จ่าย">
               <Input type="date" className="h-12" max={today} value={v("date", today)} onChange={(e) => set("date", e.target.value)} />

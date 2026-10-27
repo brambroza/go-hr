@@ -5,9 +5,12 @@ import { clsx } from "clsx";
 import { CheckCircle2, Info, Loader2, X, XCircle } from "lucide-react";
 import { inputCls } from "./input-cls";
 import { DatePicker, type PickerKind } from "./date-picker";
+import { MoneyInput } from "./money-input";
 
 export { DatePicker } from "./date-picker";
 export type { DatePickerProps, PickerKind } from "./date-picker";
+export { MoneyInput } from "./money-input";
+export type { MoneyInputProps } from "./money-input";
 
 export { clsx };
 
@@ -61,8 +64,14 @@ const DATE_TYPES: Record<string, PickerKind> = { date: "date", month: "month", "
  * Text input. `type="date" | "month" | "datetime-local"` renders the app's calendar picker instead of the
  * native control; it still calls onChange with an event-like object whose target.value is the same string
  * a native input would give, so existing `e.target.value` handlers keep working.
+ * `type="money"` renders MoneyInput (25,000.50 on screen, "25000.50" to onChange).
  */
 export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(function Input({ className, type, ...rest }, ref) {
+  if (type === "money") {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { step, ...money } = rest;
+    return <MoneyInput ref={ref} className={className} {...money} />;
+  }
   const kind = type ? DATE_TYPES[type] : undefined;
   if (kind) {
     const { value, defaultValue, onChange, min, max, disabled, readOnly, required, name, id, placeholder, autoFocus, "aria-label": ariaLabel } = rest;

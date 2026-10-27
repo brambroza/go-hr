@@ -237,7 +237,7 @@ export default function LoansPage() {
                 </Select>
               </Field>
               <Field label="เงินต้น (บาท)" required>
-                <Input type="number" step="0.01" className="num" value={form.principal ?? ""} onChange={(e) => setForm({ ...form, principal: e.target.value as unknown as number, installment_amount: undefined })} />
+                <Input type="money" className="num" value={form.principal ?? ""} onChange={(e) => setForm({ ...form, principal: e.target.value as unknown as number, installment_amount: undefined })} />
               </Field>
               <Field label="ดอกเบี้ย % ต่อปี (คงที่)">
                 <Input type="number" step="0.01" className="num" value={form.interest_rate ?? 0} onChange={(e) => setForm({ ...form, interest_rate: e.target.value as unknown as number, installment_amount: undefined })} />
@@ -246,7 +246,7 @@ export default function LoansPage() {
                 <Input type="number" min={1} className="num" value={form.installments ?? 12} onChange={(e) => setForm({ ...form, installments: Number(e.target.value), installment_amount: undefined })} />
               </Field>
               <Field label="ค่างวดต่อเดือน" hint={`คำนวณได้ ${money(calc.installment)} — แก้ได้ถ้าต้องการปัดเศษ`}>
-                <Input type="number" step="0.01" className="num" value={form.installment_amount ?? calc.installment} onChange={(e) => setForm({ ...form, installment_amount: e.target.value as unknown as number })} />
+                <Input type="money" className="num" value={form.installment_amount ?? calc.installment} onChange={(e) => setForm({ ...form, installment_amount: e.target.value as unknown as number })} />
               </Field>
               <Field label="เริ่มหักเดือน" required>
                 <Input type="month" value={String(form.start_month ?? "").slice(0, 7)} onChange={(e) => setForm({ ...form, start_month: e.target.value })} />

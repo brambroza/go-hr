@@ -135,7 +135,7 @@ export function HireWizard({ open, onClose, applicant, posting, onHired }: { ope
             <EmployeePicker value={v.supervisor_id} onChange={(x) => setV({ ...v, supervisor_id: x })} options={dir.options} placeholder="— ไม่ระบุ —" />
           </Field>
           <Field label="เงินเดือนเริ่มต้น (บาท)" hint={applicant.expected_salary ? `ผู้สมัครต้องการ ${Number(applicant.expected_salary).toLocaleString("th-TH")} บาท` : undefined}>
-            <Input type="number" min={0} value={v.salary} onChange={(e) => setV({ ...v, salary: e.target.value })} className="num" />
+            <Input type="money" min={0} value={v.salary} onChange={(e) => setV({ ...v, salary: e.target.value })} className="num" />
           </Field>
           <Field label="กะการทำงาน">
             <Select value={v.shift_id} onChange={(e) => setV({ ...v, shift_id: e.target.value })} placeholder="— กะเริ่มต้นของบริษัท —">

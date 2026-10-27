@@ -223,7 +223,7 @@ export function SettlementView({ employeeId }: { employeeId: number }) {
                 <Input type="number" inputMode="decimal" min={0} max={1000} step="0.5" className="num" placeholder="0" value={form.notice_days} onChange={(ev) => set({ notice_days: ev.target.value })} />
               </Field>
               <Field label="คืนเงินประกันการทำงาน (บาท)" hint={`เงินประกันที่เก็บไว้ ${money(data.result.guarantee_refund)} — ต้องคืนภายใน 7 วันนับจากวันพ้นสภาพ (ม.10)`}>
-                <Input type="number" inputMode="decimal" min={0} step="0.01" className="num" placeholder="คืนเต็มจำนวน" value={form.guarantee_refund} onChange={(ev) => set({ guarantee_refund: ev.target.value })} />
+                <Input type="money" min={0} className="num" placeholder="คืนเต็มจำนวน" value={form.guarantee_refund} onChange={(ev) => set({ guarantee_refund: ev.target.value })} />
               </Field>
               <Field label="หมายเหตุ" hint={overridden ? "ต้องระบุเหตุผลเมื่อแก้ค่าที่ระบบคำนวณ" : undefined} required={overridden}>
                 <Textarea rows={3} maxLength={500} value={note} onChange={(ev) => setNote(ev.target.value)} />

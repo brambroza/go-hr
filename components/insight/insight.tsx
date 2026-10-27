@@ -408,7 +408,7 @@ function BenchmarkEditor({ value, onClose, onSaved }: { value: IndustryBenchmark
                   <td className="py-1 pr-2"><Input value={b.label} onChange={(e) => setBand(i, { label: e.target.value })} className="h-9" /></td>
                   <td className="py-1 pr-2"><Input type="number" value={b.level_min} onChange={(e) => setBand(i, { level_min: Number(e.target.value) })} className="h-9" /></td>
                   <td className="py-1 pr-2"><Input type="number" value={b.level_max} onChange={(e) => setBand(i, { level_max: Number(e.target.value) })} className="h-9" /></td>
-                  <td className="py-1 pr-2"><Input type="number" value={b.median} onChange={(e) => setBand(i, { median: Number(e.target.value) })} className="h-9" /></td>
+                  <td className="py-1 pr-2"><Input type="money" value={b.median} onChange={(e) => setBand(i, { median: Number(e.target.value) })} className="h-9" /></td>
                   <td className="py-1"><button type="button" aria-label="ลบแถว" onClick={() => setV({ ...v, bands: v.bands.filter((_, j) => j !== i) })} className="p-1 text-ink-mute hover:text-rust"><Trash2 className="size-4" /></button></td>
                 </tr>
               ))}

@@ -167,7 +167,7 @@ export function CommissionsTab({ periodId, editable, onChanged }: { periodId: nu
               </Select>
             </Field>
             <Field label="ยอดฐาน (ยอดขาย/กำไร/จำนวน)">
-              <Input type="number" step="0.01" className="num" value={form.base_amount ?? ""} onChange={(e) => setForm({ ...form, base_amount: e.target.value as unknown as number })} />
+              <Input type="money" className="num" value={form.base_amount ?? ""} onChange={(e) => setForm({ ...form, base_amount: e.target.value as unknown as number })} />
             </Field>
             <Field label="หมายเหตุ" className="sm:col-span-2">
               <Input value={form.note ?? ""} onChange={(e) => setForm({ ...form, note: e.target.value })} />

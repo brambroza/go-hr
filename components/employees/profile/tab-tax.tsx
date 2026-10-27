@@ -142,7 +142,7 @@ export function TaxTab({ emp, isSelf }: TabProps) {
                     <td className="py-2 pr-3 text-right">
                       {canEdit ? (
                         <>
-                          <Input type="number" inputMode="decimal" min={0} step="0.01" className="num text-right" value={r.amount} onChange={(x) => upd(i, { amount: x.target.value })} aria-label="จำนวนเงิน" aria-invalid={!!e} />
+                          <Input type="money" min={0} className="num text-right" value={r.amount} onChange={(x) => upd(i, { amount: x.target.value })} aria-label="จำนวนเงิน" aria-invalid={!!e} />
                           {e && <div className="mt-0.5 text-xs text-rust">{e}</div>}
                         </>
                       ) : (

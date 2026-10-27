@@ -3,7 +3,7 @@
 import { useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { CheckCircle2, FileUp, Loader2, ShieldCheck } from "lucide-react";
-import { clsx, DatePicker, toast } from "@/components/ui";
+import { clsx, DatePicker, MoneyInput, toast } from "@/components/ui";
 import { EDU_LEVELS, type JobQuestion } from "@/components/recruit/labels";
 
 const inputCls =
@@ -175,7 +175,7 @@ export function ApplyForm({ slug, title, questions, consentText, companyName }: 
             <input name="last_company" className={clsx(inputCls, "h-12")} />
           </F>
           <F label="เงินเดือนที่ต้องการ (บาท)" error={fieldErr("expected_salary")}>
-            <input name="expected_salary" type="number" min={0} inputMode="numeric" className={clsx(inputCls, "num h-12")} />
+            <MoneyInput name="expected_salary" min={0} decimals={0} className="h-12" />
           </F>
           <F label="วันที่เริ่มงานได้" error={fieldErr("available_date")}>
             <DatePicker name="available_date" className="h-12" />

@@ -382,7 +382,7 @@ function CreateMovement({ open, onClose, onSaved, emps, lk, canSalary, current }
         )}
         {show.salary && (
           <Field label="เงินเดือน / ค่าจ้างใหม่" required={t === "salary_adjust"} error={err.new_salary} hint={e && current.has(e.id) ? `ปัจจุบัน ${money(current.get(e.id))}${v.new_salary && current.get(e.id) ? ` · เปลี่ยน ${(((Number(v.new_salary) - current.get(e.id)!) / current.get(e.id)!) * 100).toFixed(2)}%` : ""}` : "เว้นว่างถ้าไม่เปลี่ยน"}>
-            <Input type="number" inputMode="decimal" min={0} step="0.01" className="num" value={v.new_salary} onChange={(x) => set("new_salary", x.target.value)} />
+            <Input type="money" min={0} className="num" value={v.new_salary} onChange={(x) => set("new_salary", x.target.value)} />
           </Field>
         )}
         {t === "confirm" && <p className="text-sm text-ink-soft sm:col-span-2">สถานะจะเปลี่ยนเป็น “พนักงานประจำ” และบันทึกวันผ่านทดลองงานตามวันมีผล</p>}

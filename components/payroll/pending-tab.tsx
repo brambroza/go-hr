@@ -418,7 +418,7 @@ export function PendingTab({
             </Field>
             <Field label="จำนวนเงิน (บาท)" required hint="ติดลบ = หักคืน">
               <Input
-                type="number"
+                type="money"
                 step="0.01"
                 className="num"
                 value={form.amount ?? ""}

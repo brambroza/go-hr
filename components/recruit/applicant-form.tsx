@@ -139,7 +139,7 @@ export function ApplicantFormModal({ open, onClose, postings, onSaved, defaultPo
           <Input value={v.last_company} onChange={(e) => set("last_company", e.target.value)} placeholder="บริษัท" />
         </Field>
         <Field label="เงินเดือนที่ต้องการ">
-          <Input type="number" min={0} value={v.expected_salary} onChange={(e) => set("expected_salary", e.target.value)} className="num" />
+          <Input type="money" min={0} value={v.expected_salary} onChange={(e) => set("expected_salary", e.target.value)} className="num" />
         </Field>
         <Field label="วันที่เริ่มงานได้">
           <Input type="date" value={v.available_date} onChange={(e) => set("available_date", e.target.value)} />

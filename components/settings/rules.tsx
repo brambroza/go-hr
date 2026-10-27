@@ -72,10 +72,10 @@ type TabKey = "attendance" | "payroll" | "tax" | "sso" | "password" | "pdpa" | "
 
 // ---------------------------------------------------------------- helpers
 const n = (v: string) => (v === "" ? NaN : Number(v));
-function Num({ value, onChange, step, min, max, suffix, disabled, className }: { value: number | null | undefined; onChange: (v: number) => void; step?: string; min?: number; max?: number; suffix?: string; disabled?: boolean; className?: string }) {
+function Num({ value, onChange, step, min, max, suffix, money, disabled, className }: { value: number | null | undefined; onChange: (v: number) => void; step?: string; min?: number; max?: number; suffix?: string; money?: boolean; disabled?: boolean; className?: string }) {
   return (
     <div className={clsx("relative", className)}>
-      <Input type="number" inputMode="decimal" step={step} min={min} max={max} disabled={disabled} value={value ?? ""} onChange={(e) => onChange(n(e.target.value))} className={clsx("num", suffix && "pr-14")} />
+      <Input type={money || suffix === "บาท" ? "money" : "number"} inputMode="decimal" step={step} min={min} max={max} disabled={disabled} value={value ?? ""} onChange={(e) => onChange(n(e.target.value))} className={clsx("num", suffix && "pr-14")} />
       {suffix && <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-ink-mute">{suffix}</span>}
     </div>
   );
@@ -196,7 +196,7 @@ function AttendanceTab() {
                 <div className="flex flex-wrap items-center gap-2">
                   {v.diligence.steps.map((s, i) => (
                     <div key={i} className="flex items-center gap-1">
-                      <Num className="w-24" value={s} onChange={(x) => set({ diligence: { ...v.diligence, steps: v.diligence.steps.map((y, j) => (j === i ? x : y)) } })} />
+                      <Num className="w-24" money value={s} onChange={(x) => set({ diligence: { ...v.diligence, steps: v.diligence.steps.map((y, j) => (j === i ? x : y)) } })} />
                       <button type="button" aria-label="ลบขั้น" className="p-1 text-ink-mute hover:text-rust" onClick={() => set({ diligence: { ...v.diligence, steps: v.diligence.steps.filter((_, j) => j !== i) } })}><Trash2 className="size-4" /></button>
                     </div>
                   ))}
@@ -290,7 +290,7 @@ function PayrollTab() {
               {exemptions.map((r, i) => (
                 <tr key={i}>
                   <td className="py-1 pr-2"><Input type="date" className="h-9" value={r.from} onChange={(e) => setEx(exemptions.map((x, j) => (j === i ? { ...x, from: e.target.value } : x)))} /></td>
-                  <td className="py-1 pr-2"><Input type="number" className="num h-9" value={r.max_amount} onChange={(e) => setEx(exemptions.map((x, j) => (j === i ? { ...x, max_amount: Number(e.target.value) } : x)))} /></td>
+                  <td className="py-1 pr-2"><Input type="money" className="num h-9" value={r.max_amount} onChange={(e) => setEx(exemptions.map((x, j) => (j === i ? { ...x, max_amount: Number(e.target.value) } : x)))} /></td>
                   <td className="py-1 pr-2"><Input type="number" className="num h-9" value={r.max_days} onChange={(e) => setEx(exemptions.map((x, j) => (j === i ? { ...x, max_days: Number(e.target.value) } : x)))} /></td>
                   <td><button type="button" aria-label="ลบช่วง" className="p-1 text-ink-mute hover:text-rust" onClick={() => setEx(exemptions.filter((_, j) => j !== i))}><Trash2 className="size-4" /></button></td>
                 </tr>
@@ -367,7 +367,7 @@ function TaxTab() {
               <tbody>
                 {v.brackets.map((b, i) => (
                   <tr key={i}>
-                    <td className="py-1 pr-2"><Input type="number" className="num h-9" value={b.upto ?? ""} placeholder="ขึ้นไป" onChange={(e) => setB(i, { upto: e.target.value === "" ? null : Number(e.target.value) })} /></td>
+                    <td className="py-1 pr-2"><Input type="money" className="num h-9" value={b.upto ?? ""} placeholder="ขึ้นไป" onChange={(e) => setB(i, { upto: e.target.value === "" ? null : Number(e.target.value) })} /></td>
                     <td className="py-1 pr-2"><Num className="[&_input]:h-9" value={b.rate} suffix="%" onChange={(x) => setB(i, { rate: x })} /></td>
                     <td><button type="button" aria-label="ลบขั้น" className="p-1 text-ink-mute hover:text-rust" onClick={() => set({ brackets: v.brackets.filter((_, j) => j !== i) })}><Trash2 className="size-4" /></button></td>
                   </tr>
@@ -399,8 +399,8 @@ function TaxTab() {
                 <tr key={i}>
                   <td className="py-1 pr-2"><Input className="h-9" value={d.code} onChange={(e) => setD(i, { code: e.target.value })} /></td>
                   <td className="py-1 pr-2"><Input className="h-9" value={d.name} onChange={(e) => setD(i, { name: e.target.value })} /></td>
-                  <td className="py-1 pr-2"><Input type="number" className="num h-9" value={d.max ?? ""} onChange={(e) => setD(i, { max: e.target.value === "" ? undefined : Number(e.target.value) })} /></td>
-                  <td className="py-1 pr-2"><Input type="number" className="num h-9" value={d.per_unit ?? ""} onChange={(e) => setD(i, { per_unit: e.target.value === "" ? undefined : Number(e.target.value) })} /></td>
+                  <td className="py-1 pr-2"><Input type="money" className="num h-9" value={d.max ?? ""} onChange={(e) => setD(i, { max: e.target.value === "" ? undefined : Number(e.target.value) })} /></td>
+                  <td className="py-1 pr-2"><Input type="money" className="num h-9" value={d.per_unit ?? ""} onChange={(e) => setD(i, { per_unit: e.target.value === "" ? undefined : Number(e.target.value) })} /></td>
                   <td className="py-1 pr-2">
                     <Select className="h-9" value={d.group === "insurance" ? "insurance" : d.retirement ? "retirement" : d.donation ? "donation" : ""}
                       onChange={(e) => setD(i, { group: e.target.value === "insurance" ? "insurance" : undefined, retirement: e.target.value === "retirement" || undefined, donation: e.target.value === "donation" || undefined })}>
@@ -457,7 +457,7 @@ function SsoTab() {
                   {(v[key] as { from: string; [k: string]: number | string }[]).map((r, i) => (
                     <tr key={i}>
                       <td className="py-1 pr-2"><Input type="date" className="h-9" value={r.from} onChange={(e) => set({ [key]: v[key].map((x, j) => (j === i ? { ...x, from: e.target.value } : x)) } as Partial<Sso>)} /></td>
-                      <td className="py-1 pr-2"><Input type="number" className="num h-9" value={r[field] as number} onChange={(e) => set({ [key]: v[key].map((x, j) => (j === i ? { ...x, [field]: Number(e.target.value) } : x)) } as Partial<Sso>)} /></td>
+                      <td className="py-1 pr-2"><Input type="money" className="num h-9" value={r[field] as number} onChange={(e) => set({ [key]: v[key].map((x, j) => (j === i ? { ...x, [field]: Number(e.target.value) } : x)) } as Partial<Sso>)} /></td>
                       <td><button type="button" aria-label="ลบช่วง" className="p-1 text-ink-mute hover:text-rust" onClick={() => set({ [key]: v[key].filter((_, j) => j !== i) } as Partial<Sso>)}><Trash2 className="size-4" /></button></td>
                     </tr>
                   ))}

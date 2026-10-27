@@ -223,7 +223,7 @@ export default function SalaryAdjustPage() {
               ))}
             </div>
             <Field label={mode === "percent" ? "เพิ่มขึ้น (%)" : mode === "amount" ? "เพิ่มขึ้น (บาท)" : "เงินเดือน/ค่าจ้างใหม่ (บาท)"}>
-              <Input type="number" step="0.01" className="num" value={val} onChange={(e) => setVal(e.target.value)} />
+              <Input type={mode === "percent" ? "number" : "money"} step="0.01" className="num" value={val} onChange={(e) => setVal(e.target.value)} />
             </Field>
             {mode !== "value" && (
               <Field label="ปัดเศษขึ้นทีละ">

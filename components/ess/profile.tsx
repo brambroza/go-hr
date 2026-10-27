@@ -423,7 +423,7 @@ function TaxForm() {
               </span>
               <span className="relative w-32 shrink-0">
                 <Input
-                  type="number"
+                  type={isUnit(d) ? "number" : "money"}
                   inputMode={isUnit(d) ? "numeric" : "decimal"}
                   min={0}
                   className={`num h-11 pr-9 text-right ${over(d) ? "border-rust" : ""}`}

@@ -195,7 +195,7 @@ function FieldInput({
     case "number":
     case "money":
       input = (
-        <Input type="number" inputMode="decimal" step={f.step ?? (f.type === "money" ? "0.01" : "any")} min={f.min} max={f.max} value={str} onChange={(e) => set(e.target.value)} placeholder={f.placeholder} disabled={readOnly} className="num" />
+        <Input type={f.type} inputMode="decimal" step={f.step ?? "any"} min={f.min} max={f.max} value={str} onChange={(e) => set(e.target.value)} placeholder={f.placeholder} disabled={readOnly} className="num" />
       );
       break;
     case "date":
