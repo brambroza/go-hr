@@ -1,62 +1,83 @@
 "use client";
 
 import type { Res } from "@/lib/employees/labels";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { type DragEvent, type KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { ChevronDown, ChevronRight, Minus, Network, Plus, Rows3, Users } from "lucide-react";
+import { ChevronDown, ChevronRight, GripVertical, Minus, Network, Plus, Rows3, Users } from "lucide-react";
 import { supabaseBrowser } from "@/lib/supabase/client";
+import { useCan } from "@/components/app/me-context";
+import { buildTree, planMove, subtreeIds, type DropPos, type OrgNode, type OrgRow } from "@/lib/org/tree";
 import { Badge, Button, Checkbox, Empty, Modal, Panel, Spinner, clsx, toast } from "@/components/ui";
 import { Avatar } from "@/components/employees/avatar";
 
-export interface OrgNode {
-  id: number;
-  code: string;
-  name: string;
-  unit_type: string | null;
-  parent_id: number | null;
-  level: number;
-  headcount: number;
-  manager: { id: number; name: string; photo_url: string | null; position: string | null } | null;
-  children: OrgNode[];
-  total: number; // headcount incl. descendants
+export type { OrgNode } from "@/lib/org/tree";
+
+/** Drag-and-drop state shared by every node (chart and outline views). */
+interface DragApi {
+  enabled: boolean;
+  dragId: number | null;
+  blocked: Set<number>; // the dragged unit and its descendants — not valid drop targets
+  over: { id: number; pos: DropPos } | null;
+  start: (id: number, e: DragEvent) => void;
+  hover: (id: number, e: DragEvent, axis: "x" | "y") => void;
+  drop: (id: number | null, e: DragEvent) => void;
+  end: () => void;
 }
 
-function buildTree(rows: Omit<OrgNode, "children" | "total">[]): OrgNode[] {
-  const map = new Map<number, OrgNode>();
-  rows.forEach((r) => map.set(r.id, { ...r, children: [], total: 0 }));
-  const roots: OrgNode[] = [];
-  map.forEach((n) => {
-    const p = n.parent_id != null ? map.get(n.parent_id) : undefined;
-    if (p) p.children.push(n);
-    else roots.push(n);
-  });
-  const sum = (n: OrgNode): number => (n.total = n.headcount + n.children.reduce((a, c) => a + sum(c), 0));
-  roots.forEach(sum);
-  return roots;
+// edge quarter of a card = place before/after as a sibling; the middle = move inside
+function dropPos(e: DragEvent, axis: "x" | "y"): DropPos {
+  const r = e.currentTarget.getBoundingClientRect();
+  const f = axis === "x" ? (e.clientX - r.left) / r.width : (e.clientY - r.top) / r.height;
+  return f < 0.25 ? "before" : f > 0.75 ? "after" : "inside";
+}
+
+function onActivate(fn: () => void) {
+  return (e: KeyboardEvent) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      fn();
+    }
+  };
 }
 
 export function OrgChart() {
-  const [rows, setRows] = useState<Omit<OrgNode, "children" | "total">[] | null>(null);
+  const [rows, setRows] = useState<OrgRow[] | null>(null);
   const [collapsed, setCollapsed] = useState<Set<number>>(new Set());
   const [view, setView] = useState<"chart" | "outline">(() => (typeof window !== "undefined" && window.matchMedia("(max-width: 640px)").matches ? "outline" : "chart"));
   const [zoom, setZoom] = useState(1);
   const [selected, setSelected] = useState<OrgNode | null>(null);
+  const can = useCan();
+  const canMove = can("org", "edit");
+  const [dragId, setDragId] = useState<number | null>(null);
+  const [over, setOver] = useState<{ id: number; pos: DropPos } | null>(null);
+  const [overRoot, setOverRoot] = useState(false);
+  const [moving, setMoving] = useState(false);
 
+  const load = useCallback(
+    () =>
+      supabaseBrowser()
+        .rpc("org_chart")
+        .then(({ data, error }: Res) => {
+          if (error) toast.error(error.message);
+          setRows((data as OrgRow[]) ?? []);
+        }),
+    [],
+  );
   useEffect(() => {
-    supabaseBrowser()
-      .rpc("org_chart")
-      .then(({ data, error }: Res) => {
-        if (error) toast.error(error.message);
-        setRows((data as Omit<OrgNode, "children" | "total">[]) ?? []);
-      });
-  }, []);
+    load();
+  }, [load]);
 
   const tree = useMemo(() => (rows ? buildTree(rows) : []), [rows]);
+  const blocked = useMemo(() => (rows && dragId != null ? subtreeIds(rows, dragId) : new Set<number>()), [rows, dragId]);
   const scroller = useRef<HTMLDivElement>(null);
+  const centered = useRef(false);
   useEffect(() => {
-    // center the root horizontally on first render of the chart
+    // center the root horizontally on first render of the chart (not after every move)
     const el = scroller.current;
-    if (el && view === "chart") el.scrollLeft = (el.scrollWidth - el.clientWidth) / 2;
+    if (el && view === "chart" && !centered.current && tree.length) {
+      el.scrollLeft = (el.scrollWidth - el.clientWidth) / 2;
+      centered.current = true;
+    }
   }, [tree, view]);
   const toggle = (id: number) =>
     setCollapsed((s) => {
@@ -65,6 +86,69 @@ export function OrgChart() {
       else n.add(id);
       return n;
     });
+
+  const endDrag = () => {
+    setDragId(null);
+    setOver(null);
+    setOverRoot(false);
+  };
+
+  const move = async (id: number, targetId: number | null, pos: DropPos) => {
+    if (!rows) return;
+    const plan = planMove(rows, id, targetId, pos);
+    if (!plan) return;
+    setMoving(true);
+    const { error } = await supabaseBrowser().rpc("move_org_unit", { p_id: id, p_parent_id: plan.parentId, p_order: plan.order });
+    setMoving(false);
+    if (error) return toast.error(error.message);
+    if (plan.parentId != null) setCollapsed((s) => (s.has(plan.parentId!) ? new Set([...s].filter((x) => x !== plan.parentId)) : s));
+    const name = rows.find((r) => r.id === id)?.name;
+    const parent = plan.parentId == null ? "ระดับบนสุด" : rows.find((r) => r.id === plan.parentId)?.name;
+    toast.ok(`ย้าย ${name} ไปอยู่ใต้ ${parent} แล้ว`);
+    await load();
+  };
+
+  const drag: DragApi = {
+    enabled: canMove && !moving,
+    dragId,
+    blocked,
+    over,
+    start: (id, e) => {
+      e.stopPropagation();
+      e.dataTransfer.effectAllowed = "move";
+      e.dataTransfer.setData("text/plain", String(id)); // Firefox needs data to start a drag
+      setDragId(id);
+    },
+    hover: (id, e, axis) => {
+      if (dragId == null || blocked.has(id)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      e.dataTransfer.dropEffect = "move";
+      const pos = dropPos(e, axis);
+      if (over?.id !== id || over.pos !== pos) setOver({ id, pos });
+      if (overRoot) setOverRoot(false);
+    },
+    drop: (id, e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const src = dragId;
+      const pos = id == null ? "inside" : over?.id === id ? over.pos : dropPos(e, view === "chart" ? "x" : "y");
+      endDrag();
+      if (src != null && (id == null || !blocked.has(id))) void move(src, id, pos);
+    },
+    end: endDrag,
+  };
+
+  // scroll the chart while dragging near its edges
+  const edgeScroll = (e: DragEvent<HTMLDivElement>) => {
+    if (dragId == null) return;
+    const el = e.currentTarget;
+    const r = el.getBoundingClientRect();
+    const edge = 48;
+    const dx = e.clientX < r.left + edge ? -16 : e.clientX > r.right - edge ? 16 : 0;
+    const dy = e.clientY < r.top + edge ? -16 : e.clientY > r.bottom - edge ? 16 : 0;
+    if (dx || dy) el.scrollBy(dx, dy);
+  };
 
   if (!rows) return <Panel><div className="py-16"><Spinner className="mx-auto" /></div></Panel>;
   if (!rows.length)
@@ -75,6 +159,25 @@ export function OrgChart() {
     );
 
   const total = tree.reduce((a, n) => a + n.total, 0);
+  const dragged = dragId != null ? rows.find((r) => r.id === dragId) : undefined;
+  const rootZone = dragged && dragged.parent_id != null && (
+    <div
+      onDragOver={(e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "move";
+        if (!overRoot) setOverRoot(true);
+        if (over) setOver(null);
+      }}
+      onDragLeave={() => setOverRoot(false)}
+      onDrop={(e) => drag.drop(null, e)}
+      className={clsx(
+        "mx-4 mt-3 rounded-[var(--radius-panel)] border-2 border-dashed px-4 py-3 text-center text-sm",
+        overRoot ? "border-jade-500 bg-jade-50 text-jade-800" : "border-line text-ink-mute",
+      )}
+    >
+      วางที่นี่เพื่อให้ “{dragged.name}” เป็นหน่วยงานระดับบนสุด
+    </div>
+  );
 
   return (
     <Panel
@@ -82,6 +185,7 @@ export function OrgChart() {
       title={<span>ผังองค์กร <span className="num ml-1 text-sm font-normal text-ink-soft">{rows.length} หน่วยงาน · {total.toLocaleString()} คน</span></span>}
       actions={
         <>
+          {moving && <Spinner className="size-4" />}
           <div className="flex rounded-[var(--radius-ctl)] border border-line p-0.5" role="group" aria-label="รูปแบบการแสดงผล">
             <button type="button" aria-pressed={view === "chart"} onClick={() => setView("chart")} className={clsx("inline-flex items-center gap-1 rounded-md px-2 py-1 text-sm", view === "chart" ? "bg-jade-600 text-white" : "text-ink-soft hover:bg-jade-50")}>
               <Network className="size-4" /> แผนผัง
@@ -101,13 +205,20 @@ export function OrgChart() {
         </>
       }
     >
+      {canMove && (
+        <p className="hidden border-b border-line-soft px-4 py-2 text-xs text-ink-mute sm:block">
+          <GripVertical className="mr-1 inline size-3.5 align-[-2px]" />
+          ลากหน่วยงานไปวางกลางการ์ดของหน่วยงานอื่นเพื่อย้ายไปอยู่ใต้ หรือวางที่ขอบ{view === "chart" ? "ซ้าย/ขวา" : "บน/ล่าง"}ของการ์ดเพื่อเรียงลำดับในชั้นเดียวกัน
+        </p>
+      )}
+      {rootZone}
       {view === "chart" ? (
-        <div ref={scroller} className="thin-scroll overflow-auto bg-paper/50 p-6">
+        <div ref={scroller} onDragOver={edgeScroll} className="thin-scroll overflow-auto bg-paper/50 p-6">
           <style>{TREE_CSS}</style>
           <div style={{ zoom }} className="w-max min-w-full">
             <ul className={"gohr-orgtree"}>
               {tree.map((n) => (
-                <ChartNode key={n.id} n={n} collapsed={collapsed} toggle={toggle} onOpen={setSelected} />
+                <ChartNode key={n.id} n={n} collapsed={collapsed} toggle={toggle} onOpen={setSelected} drag={drag} />
               ))}
             </ul>
           </div>
@@ -115,7 +226,7 @@ export function OrgChart() {
       ) : (
         <ul className="py-2" role="tree">
           {tree.map((n) => (
-            <OutlineNode key={n.id} n={n} depth={0} collapsed={collapsed} toggle={toggle} onOpen={setSelected} />
+            <OutlineNode key={n.id} n={n} depth={0} collapsed={collapsed} toggle={toggle} onOpen={setSelected} drag={drag} />
           ))}
         </ul>
       )}
@@ -124,17 +235,47 @@ export function OrgChart() {
   );
 }
 
-function ChartNode({ n, collapsed, toggle, onOpen }: { n: OrgNode; collapsed: Set<number>; toggle: (id: number) => void; onOpen: (n: OrgNode) => void }) {
+/** Drag handlers + drop indicator state for one node. */
+function useNodeDrag(n: OrgNode, drag: DragApi, axis: "x" | "y") {
+  const pos = drag.over?.id === n.id ? drag.over.pos : null;
+  const props = drag.enabled
+    ? {
+        draggable: true,
+        onDragStart: (e: DragEvent) => drag.start(n.id, e),
+        onDragOver: (e: DragEvent) => drag.hover(n.id, e, axis),
+        onDrop: (e: DragEvent) => drag.drop(n.id, e),
+        onDragEnd: drag.end,
+      }
+    : {};
+  return { props, pos, isDragging: drag.dragId === n.id, isBlocked: drag.dragId != null && drag.blocked.has(n.id) };
+}
+
+function DropBar({ pos, axis }: { pos: DropPos | null; axis: "x" | "y" }) {
+  if (pos !== "before" && pos !== "after") return null;
+  const cls =
+    axis === "x"
+      ? pos === "before" ? "-left-1.5 top-0 bottom-0 w-1" : "-right-1.5 top-0 bottom-0 w-1"
+      : pos === "before" ? "-top-px left-2 right-2 h-0.5" : "-bottom-px left-2 right-2 h-0.5";
+  return <span aria-hidden className={clsx("pointer-events-none absolute z-20 rounded-full bg-jade-500", cls)} />;
+}
+
+function ChartNode({ n, collapsed, toggle, onOpen, drag }: { n: OrgNode; collapsed: Set<number>; toggle: (id: number) => void; onOpen: (n: OrgNode) => void; drag: DragApi }) {
   const isCollapsed = collapsed.has(n.id);
+  const d = useNodeDrag(n, drag, "x");
   return (
     <li>
-      <div className={"gohr-orgnode w-52"}>
-        <button
-          type="button"
+      <div className={clsx("gohr-orgnode w-52", d.isDragging && "opacity-40", d.isBlocked && !d.isDragging && "opacity-60")} {...d.props}>
+        <DropBar pos={d.pos} axis="x" />
+        <div
+          role="button"
+          tabIndex={0}
           onClick={() => onOpen(n)}
+          onKeyDown={onActivate(() => onOpen(n))}
           className={clsx(
             "block w-full rounded-[var(--radius-panel)] border bg-white p-3 text-left shadow-sm transition hover:border-jade-400 hover:shadow focus:outline-none focus-visible:ring-2 focus-visible:ring-jade-400",
             n.level === 1 ? "border-jade-600 border-t-4" : "border-line",
+            drag.enabled && "cursor-grab active:cursor-grabbing",
+            d.pos === "inside" && "border-jade-500 bg-jade-50 ring-2 ring-jade-400",
           )}
         >
           <div className="flex items-start justify-between gap-2">
@@ -160,7 +301,7 @@ function ChartNode({ n, collapsed, toggle, onOpen }: { n: OrgNode; collapsed: Se
               )}
             </div>
           </div>
-        </button>
+        </div>
         {n.children.length > 0 && (
           <button
             type="button"
@@ -176,7 +317,7 @@ function ChartNode({ n, collapsed, toggle, onOpen }: { n: OrgNode; collapsed: Se
       {n.children.length > 0 && !isCollapsed && (
         <ul>
           {n.children.map((c) => (
-            <ChartNode key={c.id} n={c} collapsed={collapsed} toggle={toggle} onOpen={onOpen} />
+            <ChartNode key={c.id} n={c} collapsed={collapsed} toggle={toggle} onOpen={onOpen} drag={drag} />
           ))}
         </ul>
       )}
@@ -184,11 +325,23 @@ function ChartNode({ n, collapsed, toggle, onOpen }: { n: OrgNode; collapsed: Se
   );
 }
 
-function OutlineNode({ n, depth, collapsed, toggle, onOpen }: { n: OrgNode; depth: number; collapsed: Set<number>; toggle: (id: number) => void; onOpen: (n: OrgNode) => void }) {
+function OutlineNode({ n, depth, collapsed, toggle, onOpen, drag }: { n: OrgNode; depth: number; collapsed: Set<number>; toggle: (id: number) => void; onOpen: (n: OrgNode) => void; drag: DragApi }) {
   const isCollapsed = collapsed.has(n.id);
+  const d = useNodeDrag(n, drag, "y");
   return (
     <li role="treeitem" aria-selected={false} aria-expanded={n.children.length ? !isCollapsed : undefined}>
-      <div className="flex items-center gap-2 border-b border-line-soft py-2 pr-4 hover:bg-jade-50/40" style={{ paddingLeft: 12 + depth * 22 }}>
+      <div
+        className={clsx(
+          "relative flex items-center gap-2 border-b border-line-soft py-2 pr-4 hover:bg-jade-50/40",
+          drag.enabled && "cursor-grab active:cursor-grabbing",
+          d.pos === "inside" && "bg-jade-50 ring-2 ring-inset ring-jade-400",
+          d.isDragging && "opacity-40",
+          d.isBlocked && !d.isDragging && "opacity-60",
+        )}
+        style={{ paddingLeft: 12 + depth * 22 }}
+        {...d.props}
+      >
+        <DropBar pos={d.pos} axis="y" />
         {n.children.length ? (
           <button type="button" onClick={() => toggle(n.id)} className="rounded p-0.5 text-ink-mute hover:bg-jade-100" aria-label={isCollapsed ? "แสดงหน่วยงานย่อย" : "ซ่อนหน่วยงานย่อย"}>
             {isCollapsed ? <ChevronRight className="size-4" /> : <ChevronDown className="size-4" />}
@@ -196,19 +349,19 @@ function OutlineNode({ n, depth, collapsed, toggle, onOpen }: { n: OrgNode; dept
         ) : (
           <span className="w-5" />
         )}
-        <button type="button" onClick={() => onOpen(n)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
+        <div role="button" tabIndex={0} onClick={() => onOpen(n)} onKeyDown={onActivate(() => onOpen(n))} className="flex min-w-0 flex-1 items-center gap-3 text-left">
           <Avatar src={n.manager?.photo_url} name={n.manager?.name ?? n.name} size={30} />
           <span className="min-w-0 flex-1">
             <span className="block truncate text-[14px] font-medium">{n.name}</span>
             <span className="block truncate text-xs text-ink-mute">{[n.unit_type, n.manager ? `หัวหน้า: ${n.manager.name}` : "ยังไม่กำหนดหัวหน้า"].filter(Boolean).join(" · ")}</span>
           </span>
           <Badge color="green"><Users className="size-3" /><span className="num">{n.total}</span></Badge>
-        </button>
+        </div>
       </div>
       {n.children.length > 0 && !isCollapsed && (
         <ul role="group">
           {n.children.map((c) => (
-            <OutlineNode key={c.id} n={c} depth={depth + 1} collapsed={collapsed} toggle={toggle} onOpen={onOpen} />
+            <OutlineNode key={c.id} n={c} depth={depth + 1} collapsed={collapsed} toggle={toggle} onOpen={onOpen} drag={drag} />
           ))}
         </ul>
       )}

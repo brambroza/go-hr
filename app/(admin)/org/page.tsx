@@ -14,7 +14,7 @@ export default function OrgPage() {
   const [version, setVersion] = useState(0);
   return (
     <div>
-      <PageHeader title="โครงสร้างองค์กร" description="ผังองค์กรสูงสุด 10 ชั้น กดที่หน่วยงานเพื่อดูรายชื่อพนักงาน" />
+      <PageHeader title="โครงสร้างองค์กร" description="ผังองค์กรไม่จำกัดชั้น กดที่หน่วยงานเพื่อดูรายชื่อพนักงาน ลากวางเพื่อย้ายหน่วยงาน" />
       <Tabs<Tab>
         className="mb-4"
         value={tab}
