@@ -1,12 +1,4 @@
--- =====================================================================
--- GO HR — ขอทดลองใช้ (trial sign-up leads)                                   (idempotent)
---
---   Used only on GoAlong's own demo server (TRIAL_SIGNUP=1). Rows are inserted by the public route
---   app/api/public/trial/route.ts through the service role after the Cloudflare Turnstile check.
---   Signed-in users with the "settings" permission read / update them at /settings/trial-leads.
---   Nobody inserts or deletes through the API: there are no insert / delete policies.
--- =====================================================================
-
+ 
 create table if not exists public.trial_leads (
   id               bigint generated always as identity primary key,
   ref_no           text generated always as ('TR' || lpad(id::text, 6, '0')) stored,
