@@ -5,7 +5,7 @@ import { publicEnv, serverSupabaseUrl } from "@/lib/public-env";
 import { buildCsp, cspHeaderName, isTruthyEnv, makeNonce } from "@/lib/security-headers";
 
 // Paths that work without a signed-in user
-const PUBLIC_PREFIXES = ["/login", "/forgot-password", "/reset-password", "/careers", "/kiosk", "/api/public", "/api/cron", "/api/device", "/api/line", "/api/csp-report", "/manifest.webmanifest", "/sw.js", "/icons"];
+const PUBLIC_PREFIXES = ["/login", "/forgot-password", "/reset-password", "/careers", "/trial", "/kiosk", "/api/public", "/api/cron", "/api/device", "/api/line", "/api/csp-report", "/manifest.webmanifest", "/sw.js", "/icons"];
 
 export async function proxy(request: NextRequest) {
   // Content-Security-Policy with a per-request nonce. Next.js reads the nonce from the *request* header
@@ -17,6 +17,8 @@ export async function proxy(request: NextRequest) {
     supabaseUrl: publicEnv().supabaseUrl,
     dev: process.env.NODE_ENV !== "production",
     extraOrigins: (process.env.CSP_EXTRA_ORIGINS ?? "").split(/[,\s]+/).filter(Boolean),
+    // Cloudflare Turnstile only on the trial sign-up page of GoAlong's demo server
+    turnstile: isTruthyEnv(process.env.TRIAL_SIGNUP) && request.nextUrl.pathname.startsWith("/trial"),
   });
   const cspHeader = cspHeaderName(isTruthyEnv(process.env.CSP_ENFORCE));
   const withNonce = () => {

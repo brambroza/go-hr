@@ -14,7 +14,12 @@ export interface CspInput {
   dev?: boolean;
   /** extra origins allowed for connect/img (e.g. a LINE LIFF SDK host) — from CSP_EXTRA_ORIGINS */
   extraOrigins?: string[];
+  /** Cloudflare Turnstile widget on the page (trial sign-up): allow its script host + iframe */
+  turnstile?: boolean;
 }
+
+/** Turnstile widget host — kept here so this module stays dependency free */
+const TURNSTILE_HOST = "https://challenges.cloudflare.com";
 
 /** origin (scheme://host[:port]) of a URL, or null when it is not a valid absolute URL */
 export function originOf(url: string | null | undefined): string | null {
@@ -36,6 +41,10 @@ export function buildCsp(i: CspInput): string {
   const ws = remote.map((o) => o.replace(/^http/, "ws"));
   const script = [`'self'`, `'nonce-${i.nonce}'`, `'strict-dynamic'`, `'wasm-unsafe-eval'`];
   if (i.dev) script.push(`'unsafe-eval'`);
+  // host allow-list is ignored by browsers that honour 'strict-dynamic' (the <script> carries the nonce);
+  // it is the fallback for older browsers
+  if (i.turnstile) script.push(TURNSTILE_HOST);
+  const cf = i.turnstile ? [TURNSTILE_HOST] : [];
   const directives: [string, string[]][] = [
     ["default-src", [`'self'`]],
     ["base-uri", [`'self'`]],
@@ -48,9 +57,9 @@ export function buildCsp(i: CspInput): string {
     ["img-src", [`'self'`, "data:", "blob:", ...remote]],
     ["font-src", [`'self'`, "data:"]],
     ["media-src", [`'self'`, "blob:", ...remote]],
-    ["connect-src", [`'self'`, ...remote, ...ws, ...(i.dev ? ["ws:", "wss:"] : [])]],
+    ["connect-src", [`'self'`, ...remote, ...ws, ...cf, ...(i.dev ? ["ws:", "wss:"] : [])]],
     ["worker-src", [`'self'`, "blob:"]],
-    ["frame-src", [`'self'`, "blob:", ...remote]],
+    ["frame-src", [`'self'`, "blob:", ...remote, ...cf]],
     ["manifest-src", [`'self'`]],
     ["report-uri", ["/api/csp-report"]],
   ];
