@@ -64,6 +64,7 @@ export async function POST(req: NextRequest) {
       console.error("[trial] TURNSTILE_SECRET_KEY is not set — sign-up refused");
       return bad("ระบบยังไม่พร้อมรับสมัคร กรุณาติดต่อทาง LINE", 503);
     }
+    console.warn("[trial] turnstile refused:", bot.codes.join(","));
     return bad("ยืนยันว่าไม่ใช่บอทไม่สำเร็จ กรุณากดยืนยันอีกครั้ง", 400, "turnstile");
   }
 

@@ -238,13 +238,13 @@ function TrialDone({ done, contactLine }: { done: Done; contactLine?: string }) 
             {done.accounts.map((a) => (
               <li key={a.login} className="rounded-[var(--radius-panel)] border border-line bg-paper p-4">
                 <div className="font-medium text-ink">{a.label}</div>
-                <div className="mt-1 flex items-center gap-2 text-sm text-ink-soft">
+                <div className="mt-1 flex items-center gap-2 whitespace-nowrap text-sm text-ink-soft">
                   ผู้ใช้ <code className="num text-ink">{a.login}</code>
                   <button type="button" onClick={() => copy(a.login)} className="grid size-11 place-items-center rounded-md hover:bg-white" aria-label={`คัดลอกชื่อผู้ใช้ ${a.label}`}>
                     <Copy className="size-4" />
                   </button>
                 </div>
-                <div className="flex items-center gap-2 text-sm text-ink-soft">
+                <div className="flex items-center gap-2 whitespace-nowrap text-sm text-ink-soft">
                   รหัสผ่าน <code className="num text-ink">{a.password}</code>
                   <button type="button" onClick={() => copy(a.password)} className="grid size-11 place-items-center rounded-md hover:bg-white" aria-label={`คัดลอกรหัสผ่าน ${a.label}`}>
                     <Copy className="size-4" />

@@ -164,7 +164,7 @@ export function TrialLeads() {
                         {r.email && <span className="text-ink-soft">{r.email}</span>}
                       </div>
                     </td>
-                    <td className="num px-4 py-3 text-ink">{r.headcount_range}</td>
+                    <td className="num whitespace-nowrap px-4 py-3 text-ink">{r.headcount_range}</td>
                     <td className="px-4 py-3">
                       <Badge color={STATUS[r.status].color}>{STATUS[r.status].label}</Badge>
                       {r.sales_note && <div className="mt-1 max-w-[200px] text-xs text-ink-soft">{r.sales_note}</div>}
