@@ -5,7 +5,7 @@ import { publicEnv, serverSupabaseUrl } from "@/lib/public-env";
 import { buildCsp, cspHeaderName, isTruthyEnv, makeNonce } from "@/lib/security-headers";
 
 // Paths that work without a signed-in user
-const PUBLIC_PREFIXES = ["/login", "/forgot-password", "/reset-password", "/careers", "/trial", "/kiosk", "/api/public", "/api/cron", "/api/device", "/api/line", "/api/csp-report", "/manifest.webmanifest", "/sw.js", "/icons"];
+const PUBLIC_PREFIXES = ["/login", "/forgot-password", "/reset-password", "/careers", "/trial", "/kiosk", "/api/public", "/api/cron", "/api/device", "/api/line", "/api/csp-report", "/manifest.webmanifest", "/sw.js", "/icons", "/robots.txt", "/sitemap.xml", "/landing/"];
 
 export async function proxy(request: NextRequest) {
   // Content-Security-Policy with a per-request nonce. Next.js reads the nonce from the *request* header
@@ -54,7 +54,9 @@ export async function proxy(request: NextRequest) {
   // Refreshes the session cookie when needed — must run before any redirect decision
   const { data } = await supabase.auth.getUser();
   const path = request.nextUrl.pathname;
-  const isPublic = path === "/" ? false : PUBLIC_PREFIXES.some((p) => path === p || path.startsWith(p + "/") || path.startsWith(p));
+  // "/" is the public landing page on GoAlong's demo server (TRIAL_SIGNUP=1); on a customer install app/page.tsx
+  // still sends visitors to /login
+  const isPublic = path === "/" ? isTruthyEnv(process.env.TRIAL_SIGNUP) : PUBLIC_PREFIXES.some((p) => path === p || path.startsWith(p + "/") || path.startsWith(p));
 
   if (!data.user && !isPublic) {
     if (path.startsWith("/api/")) {
