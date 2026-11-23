@@ -12,15 +12,19 @@
 #   --company "<name>"     company name shown on the login page (editable later)
 #   --license <string>     license key (can also be pasted later in Settings → License)
 #   --image <name>         use a prebuilt image (docker load / registry) instead of building
+#   --no-backup-cron       do not schedule the nightly backup (only when backups are handled elsewhere)
+#   --upgrade-supabase     re-download the Supabase docker setup at the commit pinned in versions.env
+#                          (secrets and data are kept; take a backup and test on staging first)
 #
-# Re-running is safe: secrets are kept, migrations apply only once (also use it for upgrades: git pull && install.sh).
+# Re-running is safe: secrets, domain and TLS mode are kept unless given again, migrations apply only once.
+# To move to a new GO HR version use deploy/upgrade.sh (backup → build → migrate → restart → health check).
 # =====================================================================
 set -euo pipefail
 cd "$(dirname "$0")"
 DEPLOY_DIR=$(pwd)
 ROOT=$(cd .. && pwd)
 
-DOMAIN=""; TLS="internal"; ADMIN_EMAIL=""; COMPANY=""; LICENSE=""; IMAGE=""
+DOMAIN=""; TLS=""; ADMIN_EMAIL=""; COMPANY=""; LICENSE=""; IMAGE=""; BACKUP_CRON=1; UPGRADE_SUPABASE=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --domain) DOMAIN="$2"; shift 2 ;;
@@ -29,10 +33,25 @@ while [ $# -gt 0 ]; do
     --company) COMPANY="$2"; shift 2 ;;
     --license) LICENSE="$2"; shift 2 ;;
     --image) IMAGE="$2"; shift 2 ;;
+    --no-backup-cron) BACKUP_CRON=0; shift ;;
+    --upgrade-supabase) UPGRADE_SUPABASE=1; shift ;;
     *) echo "unknown option $1"; exit 1 ;;
   esac
 done
-[ -z "$DOMAIN" ] && { echo "ต้องระบุ --domain (เช่น hr.company.co.th หรือ IP ของเครื่อง)"; exit 1; }
+# value of KEY in an env file ('' when the file or the key is missing)
+getenv() { if [ -f "$1" ]; then sed -n "s/^$2=//p" "$1" | head -1; fi; }
+# A re-run keeps what the first install chose: before, leaving out --tls silently turned a Let's Encrypt site into a
+# self-signed one.
+if [ -z "$DOMAIN" ]; then DOMAIN=$(getenv .env GOHR_DOMAIN); fi
+if [ -z "$TLS" ]; then TLS=$(getenv .env TLS_MODE); fi
+if [ -z "$TLS" ]; then TLS="internal"; fi
+if [ -z "$DOMAIN" ]; then echo "ต้องระบุ --domain (เช่น hr.company.co.th หรือ IP ของเครื่อง)"; exit 1; fi
+case "$DOMAIN" in *[!A-Za-z0-9.:-]*) echo "--domain ไม่ถูกต้อง: $DOMAIN"; exit 1 ;; esac
+case "$TLS" in
+  *[!A-Za-z0-9.@_+-]*) echo "--tls ไม่ถูกต้อง"; exit 1 ;;
+  internal | *@*.*) ;;
+  *) echo "--tls ต้องเป็น internal หรืออีเมล (บัญชี Let's Encrypt)"; exit 1 ;;
+esac
 
 step() { printf '\n\033[1;32m▶ %s\033[0m\n' "$*"; }
 need() { command -v "$1" >/dev/null || { echo "ไม่พบคำสั่ง $1 — กรุณาติดตั้งก่อน"; exit 1; }; }
@@ -62,7 +81,19 @@ APP_VERSION=$(sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' "$ROOT/package.json" |
 
 # ---------------------------------------------------------------- 1. Supabase (official docker setup)
 step "เตรียม Supabase (ref ${SUPABASE_REF:0:12})"
-if [ ! -f supabase/docker-compose.yml ]; then
+# The secrets in supabase/.env belong to the data in supabase/volumes: the database was initialised with that
+# password and every stored session / encrypted value depends on those keys. They are generated exactly once.
+# Data without its .env means the secrets were lost — generating new ones here would lock everything out.
+if [ ! -f supabase/.env ] && [ -d supabase/volumes/db/data ] && [ -n "$(ls -A supabase/volumes/db/data 2>/dev/null)" ]; then
+  echo "พบฐานข้อมูลเดิมที่ deploy/supabase/volumes/db/data แต่ไม่มี deploy/supabase/.env (คีย์/รหัสผ่านของฐานข้อมูลนั้น)" >&2
+  echo "หยุดการติดตั้ง: กู้ไฟล์ตั้งค่าจากข้อมูลสำรองก่อน — deploy/restore.sh --config <config-...tgz> <โฟลเดอร์ว่าง>" >&2
+  exit 1
+fi
+have_ref=$(cat supabase/.gohr-supabase-ref 2>/dev/null || true)
+if [ -f supabase/docker-compose.yml ] && [ "$have_ref" != "$SUPABASE_REF" ] && [ "$UPGRADE_SUPABASE" = 0 ]; then
+  echo "หมายเหตุ: Supabase ที่ติดตั้งอยู่ (${have_ref:0:12}) ต่างจาก versions.env (${SUPABASE_REF:0:12}) — ยังใช้ชุดเดิม; อัปเกรดด้วย --upgrade-supabase หลังสำรองข้อมูล"
+fi
+if [ ! -f supabase/docker-compose.yml ] || { [ "$UPGRADE_SUPABASE" = 1 ] && [ "$have_ref" != "$SUPABASE_REF" ]; }; then
   tmp=$(mktemp -d)
   # fetch exactly the pinned commit (no branch checkout → no surprise upgrade)
   git -C "$tmp" init -q supabase
@@ -70,8 +101,13 @@ if [ ! -f supabase/docker-compose.yml ]; then
   git -C "$tmp/supabase" fetch -q --depth 1 origin "$SUPABASE_REF"
   git -C "$tmp/supabase" checkout -q FETCH_HEAD
   mkdir -p supabase && cp -rf "$tmp/supabase/docker/." supabase/ && rm -rf "$tmp"
+  # (the copy above brings the compose file and config templates; it never touches supabase/.env or the data
+  #  under supabase/volumes/db/data)
   echo "$SUPABASE_REF" > supabase/.gohr-supabase-ref
+fi
+if [ ! -f supabase/.env ]; then
   cp supabase/.env.example supabase/.env
+  chmod 600 supabase/.env
   JWT_SECRET=$(rand 32)
   setenv supabase/.env POSTGRES_PASSWORD "$(rand 20)"
   setenv supabase/.env JWT_SECRET "$JWT_SECRET"
@@ -79,8 +115,14 @@ if [ ! -f supabase/docker-compose.yml ]; then
   setenv supabase/.env SERVICE_ROLE_KEY "$(jwt service_role "$JWT_SECRET")"
   setenv supabase/.env DASHBOARD_PASSWORD "$(rand 12)"
   for k in SECRET_KEY_BASE VAULT_ENC_KEY PG_META_CRYPTO_KEY LOGFLARE_PUBLIC_ACCESS_TOKEN LOGFLARE_PRIVATE_ACCESS_TOKEN LOGFLARE_API_KEY; do
-    grep -q "^$k=" supabase/.env && setenv supabase/.env "$k" "$(rand 32)"
+    if grep -q "^$k=" supabase/.env; then setenv supabase/.env "$k" "$(rand 32)"; fi
   done
+else
+  # a newer Supabase setup may need settings the old .env does not have: add the missing keys with their defaults
+  while IFS= read -r line; do
+    k=${line%%=*}
+    grep -q "^$k=" supabase/.env || echo "$line" >> supabase/.env
+  done < <(grep -E '^[A-Z][A-Z0-9_]*=' supabase/.env.example)
 fi
 setenv supabase/.env SITE_URL "$PUBLIC_URL"
 setenv supabase/.env API_EXTERNAL_URL "$PUBLIC_URL"
@@ -127,6 +169,23 @@ grep -q '^CSP_ENFORCE=' .env || setenv .env CSP_ENFORCE "0"     # Content-Securi
 if [ -n "$IMAGE" ]; then setenv .env GOHR_IMAGE "$IMAGE"; else setenv .env GOHR_IMAGE "gohr/app:${APP_VERSION:-dev}"; fi
 chmod 600 .env supabase/.env
 
+# ---------------------------------------------------------------- 3b. nightly backup (on by default)
+# A server without a scheduled backup loses everything with its disk. The schedule is installed here so that it does
+# not depend on somebody remembering a manual step; the off-site target still has to be chosen (backup.env).
+if [ ! -f backup.env ]; then cp backup.env.example backup.env; chmod 600 backup.env; fi
+if [ "$BACKUP_CRON" = 1 ]; then
+  if [ -d /etc/cron.d ]; then
+    printf '%s\n' "# GO HR nightly backup (written by deploy/install.sh)" \
+      "30 1 * * * root $DEPLOY_DIR/backup.sh >> /var/log/gohr-backup.log 2>&1" > /etc/cron.d/gohr-backup
+    chmod 644 /etc/cron.d/gohr-backup
+    BACKUP_NOTE="ทุกคืน 01:30 (/etc/cron.d/gohr-backup) → /var/backups/gohr  log: /var/log/gohr-backup.log"
+  else
+    BACKUP_NOTE="!! ไม่พบ /etc/cron.d — ยังไม่ได้ตั้งเวลาสำรองข้อมูล ติดตั้ง cron แล้วรัน install.sh อีกครั้ง"
+  fi
+else
+  BACKUP_NOTE="ไม่ได้ตั้งเวลา (--no-backup-cron) — ต้องมีระบบสำรองข้อมูลอื่นเรียก $DEPLOY_DIR/backup.sh"
+fi
+
 step "สร้างและเริ่มระบบ GO HR"
 if [ -n "$IMAGE" ]; then
   docker compose --env-file .env -f docker-compose.yml up -d
@@ -134,11 +193,26 @@ else
   docker compose --env-file .env -f docker-compose.yml up -d --build
 fi
 
+printf 'รอระบบพร้อมใช้งาน'
+healthy=0
+for _ in $(seq 1 60); do
+  if docker compose --env-file .env -f docker-compose.yml exec -T app wget -qO- http://127.0.0.1:3000/api/public/health >/dev/null 2>&1; then healthy=1; break; fi
+  printf '.'; sleep 3
+done
+echo
+if [ "$healthy" != 1 ]; then echo "!! แอปยังไม่ตอบ /api/public/health — ตรวจด้วย: docker compose logs app"; fi
+
 # ---------------------------------------------------------------- 4. first admin + company
 if [ -n "$COMPANY" ]; then
-  docker exec -i supabase-db psql -q -U supabase_admin -d postgres -c \
-    "update public.settings set value = value || jsonb_build_object('name', \$\$${COMPANY}\$\$) where key = 'company';" >/dev/null
+  # psql variable (:'company') — the name is passed as data, never pasted into the SQL text
+  printf '%s\n' "update public.settings set value = value || jsonb_build_object('name', :'company') where key = 'company';" |
+    docker exec -i supabase-db psql -q -U supabase_admin -d postgres -v ON_ERROR_STOP=1 -v company="$COMPANY" >/dev/null
 fi
+# the e-mail goes into a JSON body and an SQL statement below: accept plain addresses only
+case "$ADMIN_EMAIL" in
+  "") ;;
+  *[!A-Za-z0-9.@_+-]* | *@*@*) echo "--admin-email ไม่ถูกต้อง — ข้ามการสร้างผู้ดูแลระบบ"; ADMIN_EMAIL="" ;;
+esac
 if [ -n "$ADMIN_EMAIL" ]; then
   step "สร้างผู้ดูแลระบบ"
   PW="Go$(rand 5)!"
@@ -162,7 +236,9 @@ cat <<EOF
   เว็บระบบ HR / แอปพนักงาน : $PUBLIC_URL        (พนักงานเปิด $PUBLIC_URL/m แล้วกด "เพิ่มไปยังหน้าจอหลัก")
   หน้าสมัครงาน            : $PUBLIC_URL/careers
   Supabase Studio         : http://<server-ip>:${KONG_HTTP_PORT:-8000}  (user: ${DASHBOARD_USERNAME:-supabase})  — อย่าเปิดพอร์ตนี้สู่อินเทอร์เน็ต
-  สำรองข้อมูลอัตโนมัติ      : เพิ่ม "30 1 * * * $DEPLOY_DIR/backup.sh" ใน crontab ของ root
-  สำรองนอกเครื่อง          : ตั้ง BACKUP_OFFSITE ใน $DEPLOY_DIR/backup.env (ดู backup.env.example) แล้วซ้อมกู้คืน: $DEPLOY_DIR/restore.sh --drill <ไฟล์ dump>
+  สำรองข้อมูลอัตโนมัติ      : $BACKUP_NOTE
+  สำรองนอกเครื่อง (ต้องทำ)  : ตั้ง BACKUP_OFFSITE + BACKUP_PASSPHRASE_FILE ใน $DEPLOY_DIR/backup.env แล้วซ้อมกู้คืน: $DEPLOY_DIR/restore.sh --drill <ไฟล์ dump>
+                            เก็บสำเนารหัสผ่านสำรองข้อมูลไว้นอกเครื่องนี้ (ผู้ดูแลไอทีของลูกค้า + GoAlong) — ไม่มีรหัส = กู้คืนไม่ได้
+  อัปเกรดเวอร์ชัน          : $DEPLOY_DIR/upgrade.sh
   License                 : ตั้งค่า → License / ระบบ (ยังไม่ติดตั้ง = ทดลองใช้ได้ 10 คน)
 EOF

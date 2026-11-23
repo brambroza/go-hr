@@ -26,6 +26,24 @@ function authError(e: { message?: string } | null): Error {
   return new Error(m || "ทำรายการกับระบบยืนยันตัวตนไม่สำเร็จ");
 }
 
+type Actor = { userId: string; isAdmin: boolean };
+
+/**
+ * An account with administrator rights may only be managed by another administrator.
+ * Without this, a user holding security:edit could reset an administrator's password (or change the e-mail,
+ * disable or delete the account) and take the system over.
+ * @param sb service-role client
+ * @param me the signed-in user performing the action
+ * @param userId the account being changed
+ * @throws when the target is an administrator and the actor is not
+ */
+async function assertMayManage(sb: Admin, me: Actor, userId: string): Promise<void> {
+  if (me.isAdmin) return;
+  const { data, error } = await sb.from("profiles").select("is_admin").eq("id", userId).maybeSingle();
+  if (error) throw new Error(error.message);
+  if (data?.is_admin) throw new Error("บัญชีผู้ดูแลระบบแก้ไขได้เฉพาะผู้ดูแลระบบเท่านั้น");
+}
+
 const USERNAME_RE = /^[A-Za-z0-9._-]{3,50}$/;
 
 async function assertUsernameFree(sb: Admin, username: string, exceptId?: string) {
@@ -108,6 +126,7 @@ export async function updateUserAction(userId: string, input: UpdateUserInput): 
   return safeAction(async () => {
     const me = await requirePerm("security", "edit");
     const sb = supabaseAdmin();
+    await assertMayManage(sb, me, userId);
     const { data: cur } = await sb.from("profiles").select("*").eq("id", userId).maybeSingle();
     if (!cur) throw new Error("ไม่พบผู้ใช้");
     const patch: Record<string, unknown> = {};
@@ -147,6 +166,7 @@ export async function resetPasswordAction(userId: string, password: string, must
   return safeAction(async () => {
     const me = await requirePerm("security", "edit");
     const sb = supabaseAdmin();
+    await assertMayManage(sb, me, userId);
     assertPassword(password, await policy(sb));
     const { error } = await sb.auth.admin.updateUserById(userId, { password });
     if (error) throw authError(error);
@@ -160,6 +180,7 @@ export async function setActiveAction(userId: string, active: boolean): Promise<
     const me = await requirePerm("security", "edit");
     if (userId === me.userId && !active) throw new Error("ไม่สามารถปิดการใช้งานบัญชีของตัวเองได้");
     const sb = supabaseAdmin();
+    await assertMayManage(sb, me, userId);
     if (active) {
       // an employee who has left cannot be re-enabled here — the resign sync would lock the account again tonight
       const { data: prof } = await sb.from("profiles").select("employee_id, is_admin").eq("id", userId).maybeSingle();
@@ -186,6 +207,7 @@ export async function deleteUserAction(userId: string): Promise<ActionResult> {
     const me = await requirePerm("security", "delete");
     if (userId === me.userId) throw new Error("ไม่สามารถลบบัญชีของตัวเองได้");
     const sb = supabaseAdmin();
+    await assertMayManage(sb, me, userId);
     const { error } = await sb.auth.admin.deleteUser(userId);
     if (error) throw authError(error);
     await audit(sb, me.userId, me.displayName, "DELETE_USER", userId, null);

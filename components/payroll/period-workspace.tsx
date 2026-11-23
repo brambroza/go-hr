@@ -1,12 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, ArrowLeft, Banknote, Calculator, Check, CheckCheck, Download, FileCog, FileSpreadsheet, Lock, Printer, Search, Send, Trash2, Undo2 } from "lucide-react";
 import { supabaseBrowser } from "@/lib/supabase/client";
 import { useCan } from "@/components/app/me-context";
-import { Badge, Button, Empty, Input, PageHeader, Panel, Select, Spinner, Stat, Tabs, clsx, toast, useConfirm } from "@/components/ui";
+import { Badge, Button, Empty, Input, PageHeader, Panel, Select, Spinner, Stat, Tabs, Textarea, clsx, toast, useConfirm } from "@/components/ui";
 import { money, thDate, thDateTime } from "@/lib/format";
 import { PERIOD_TYPE_LABEL, STATUS_COLOR, STATUS_STEPS, STATUS_TEXT, UNIT_LABEL, sumBy } from "@/lib/payroll/labels";
 import { fetchRows } from "@/lib/payroll/fetch";
@@ -32,6 +32,7 @@ export function PeriodWorkspace({ id }: { id: number }) {
   const [branches, setBranches] = useState<{ id: number; name: string }[]>([]);
   const [tab, setTab] = useState<Tab>("entries");
   const [busy, setBusy] = useState<string | null>(null);
+  const reopenReason = useRef("");
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState({ org: "", branch: "", unit: "", pay: "", warn: false });
   const [detail, setDetail] = useState<Entry | null>(null);
@@ -99,6 +100,25 @@ export function PeriodWorkspace({ id }: { id: number }) {
     load();
   }
 
+  /** reopen: a period that was already paid needs a written reason (kept in the audit log) */
+  async function reopen() {
+    reopenReason.current = "";
+    const paid = st === "paid";
+    const ask = paid ? (
+      <div className="space-y-2">
+        <p>เปิดแก้ไขงวดที่จ่ายแล้ว? ระบบจะยกเลิกการตัดยอดเงินกู้ เบิกล่วงหน้า และเงินประกันของงวดนี้ และซ่อนสลิปจากพนักงาน</p>
+        <Textarea rows={3} maxLength={500} placeholder="เหตุผลที่เปิดแก้ไข (จำเป็น)" aria-label="เหตุผลที่เปิดแก้ไข" onChange={(e) => (reopenReason.current = e.target.value)} />
+      </div>
+    ) : (
+      "เปิดแก้ไขงวดนี้? สถานะจะกลับเป็น “คำนวณแล้ว” และสลิปจะถูกซ่อนจากพนักงาน"
+    );
+    if (!(await confirm(ask, { danger: paid }))) return;
+    const r = await run("reopen", () => workflowAction(id, "reopen", reopenReason.current));
+    if (!r) return;
+    toast.ok(String(r.data ?? "เรียบร้อย"));
+    load();
+  }
+
   const stepIndex = STATUS_STEPS.findIndex((s) => s.value === st);
   const canApprove = can("payroll", "approve");
   const canEdit = can("payroll", "edit");
@@ -116,7 +136,7 @@ export function PeriodWorkspace({ id }: { id: number }) {
         </Button>
       )}
       {(st === "approved" || st === "paid") && canApprove && (
-        <Button variant="ghost" icon={<Undo2 className="size-4" />} loading={busy === "reopen"} onClick={() => wf("reopen", st === "paid" ? "เปิดแก้ไขงวดที่จ่ายแล้ว? ระบบจะยกเลิกการตัดยอดเงินกู้ เบิกล่วงหน้า และเงินประกันของงวดนี้ และซ่อนสลิปจากพนักงาน" : "เปิดแก้ไขงวดนี้? สถานะจะกลับเป็น “คำนวณแล้ว” และสลิปจะถูกซ่อนจากพนักงาน")}>
+        <Button variant="ghost" icon={<Undo2 className="size-4" />} loading={busy === "reopen"} onClick={reopen}>
           เปิดแก้ไข
         </Button>
       )}

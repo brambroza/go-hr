@@ -227,7 +227,7 @@ export function computeEntry(input: EmployeePayInput): EntryResult {
     } else if (priv.salary_unit === "day") {
       const paidDays = att.work_days + att.paid_holiday_days + att.paid_leave_days;
       base = daily * paidDays;
-      push(items.salary, base, { qty: paidDays, rate: daily, name: `ค่าจ้างรายวัน (${paidDays} วัน)` });
+      push(items.salary, base, { qty: r2(paidDays), rate: daily, name: `ค่าจ้างรายวัน (${r2(paidDays)} วัน)` });
     } else {
       const hours = att.work_minutes / 60 + att.paid_leave_days * cfg.hours_per_day;
       base = hourly * hours;
@@ -242,8 +242,11 @@ export function computeEntry(input: EmployeePayInput): EntryResult {
       if (cfg.deduct_absent && att.absent_days > 0) push(items.absent, daily * att.absent_days, { qty: att.absent_days, rate: daily });
       if (att.unpaid_leave_days > 0) push(items.unpaid_leave, daily * att.unpaid_leave_days, { qty: r2(att.unpaid_leave_days), rate: daily });
     }
-    if (cfg.deduct_late && att.late_minutes > 0) push(items.late, (hourly / 60) * att.late_minutes, { qty: att.late_minutes, rate: hourly / 60 });
-    if (cfg.deduct_early && att.early_minutes > 0) push(items.early, (hourly / 60) * att.early_minutes, { qty: att.early_minutes, rate: hourly / 60 });
+    // hourly pay is counted from the minutes actually worked, so the late / early minutes are already unpaid —
+    // deducting them as well took the same time twice
+    const timeDeductible = priv.salary_unit !== "hour";
+    if (timeDeductible && cfg.deduct_late && att.late_minutes > 0) push(items.late, (hourly / 60) * att.late_minutes, { qty: att.late_minutes, rate: hourly / 60 });
+    if (timeDeductible && cfg.deduct_early && att.early_minutes > 0) push(items.early, (hourly / 60) * att.early_minutes, { qty: att.early_minutes, rate: hourly / 60 });
     for (const [rate, minutes] of Object.entries(att.ot_minutes ?? {})) {
       if (!minutes) continue;
       const it = items[OT_KEYS[rate] ?? "ot_1_5"];

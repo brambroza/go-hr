@@ -26,7 +26,7 @@ export default async function ChangePasswordPage({ searchParams }: PageProps<"/a
           )}
           <span className="font-semibold">{company.name}</span>
         </div>
-        <ChangePasswordForm first={first} policy={normalizePolicy(data?.value)} name={me.displayName} email={me.email} />
+        <ChangePasswordForm first={first} policy={normalizePolicy(data?.value)} name={me.displayName} />
       </div>
     </main>
   );

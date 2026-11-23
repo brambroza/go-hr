@@ -8,3 +8,8 @@ deploy/supabase
 deploy/.env
 tests
 *.md
+# customer-server state and secrets never go into an image
+deploy/backup.env
+deploy/.upgrade-state
+**/*.pem
+docs

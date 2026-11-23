@@ -6,8 +6,9 @@ import { Check, Circle, Eye, EyeOff, LogOut } from "lucide-react";
 import { Button, Field, Input, clsx, toast } from "@/components/ui";
 import { supabaseBrowser } from "@/lib/supabase/client";
 import { checkPassword, type PasswordPolicy } from "@/lib/employees/password";
+import { changePasswordAction } from "./actions";
 
-export function ChangePasswordForm({ first, policy, name, email }: { first: boolean; policy: PasswordPolicy; name: string; email: string | null }) {
+export function ChangePasswordForm({ first, policy, name }: { first: boolean; policy: PasswordPolicy; name: string }) {
   const router = useRouter();
   const [current, setCurrent] = useState("");
   const [pw, setPw] = useState("");
@@ -34,27 +35,10 @@ export function ChangePasswordForm({ first, policy, name, email }: { first: bool
     if (pw !== pw2) return setError("ยืนยันรหัสผ่านใหม่ไม่ตรงกัน");
     if (pw === current) return setError("รหัสผ่านใหม่ต้องไม่ซ้ำกับรหัสผ่านเดิม");
     setLoading(true);
-    const sb = supabaseBrowser();
-    // verify the current password by re-authenticating
-    const { data: u } = await sb.auth.getUser();
-    const login = u.user?.email ?? email;
-    if (!login) {
-      setLoading(false);
-      return setError("ไม่พบบัญชีผู้ใช้ กรุณาเข้าสู่ระบบใหม่");
-    }
-    const { error: authErr } = await sb.auth.signInWithPassword({ email: login, password: current });
-    if (authErr) {
-      setLoading(false);
-      return setError("รหัสผ่านปัจจุบันไม่ถูกต้อง");
-    }
-    const { error: upErr } = await sb.auth.updateUser({ password: pw });
-    if (upErr) {
-      setLoading(false);
-      return setError(/same|different/i.test(upErr.message) ? "รหัสผ่านใหม่ต้องไม่ซ้ำกับรหัสผ่านเดิม" : `เปลี่ยนรหัสผ่านไม่สำเร็จ: ${upErr.message}`);
-    }
-    const { error: rpcErr } = await sb.rpc("password_changed");
+    // verified and written on the server (current password, password policy) — see ./actions.ts
+    const r = await changePasswordAction(current, pw).catch(() => ({ ok: false as const, error: "เปลี่ยนรหัสผ่านไม่ได้ชั่วคราว กรุณาลองใหม่อีกครั้ง" }));
     setLoading(false);
-    if (rpcErr) return setError(`เปลี่ยนรหัสผ่านแล้ว แต่บันทึกสถานะไม่สำเร็จ: ${rpcErr.message}`);
+    if (!r.ok) return setError(r.error);
     setDone(true);
     toast.ok("เปลี่ยนรหัสผ่านแล้ว");
     router.replace("/");

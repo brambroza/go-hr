@@ -45,3 +45,19 @@ export function randomPassword(p: PasswordPolicy = DEFAULT_POLICY): string {
   while (chars.length < Math.max(10, p.min_length)) chars.push(pick(all));
   return chars.sort(() => Math.random() - 0.5).join("");
 }
+
+/**
+ * Checks a change-password request before the server touches the auth service.
+ * @param current the password the user typed as their current one
+ * @param next the new password
+ * @param p the company password policy
+ * @returns a Thai error message, or null when the request may proceed
+ */
+export function passwordChangeError(current: string, next: string, p: PasswordPolicy): string | null {
+  if (!current) return "กรอกรหัสผ่านปัจจุบัน";
+  if (next.length > 200) return "รหัสผ่านใหม่ยาวเกินไป";
+  const miss = checkPassword(next, p);
+  if (miss.length) return `รหัสผ่านใหม่ต้อง${miss.join(", ")}`;
+  if (next === current) return "รหัสผ่านใหม่ต้องไม่ซ้ำกับรหัสผ่านเดิม";
+  return null;
+}

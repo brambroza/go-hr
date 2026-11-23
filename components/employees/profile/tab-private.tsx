@@ -44,7 +44,7 @@ const FIELDS: FieldDef[] = [
   { name: "tax_method", label: "วิธีหักภาษี ณ ที่จ่าย", type: "select", required: true, options: taxMethodOptions, section: "ภาษี" },
   { name: "tax_fixed_rate", label: "อัตราคงที่ (%)", type: "number", step: "0.01", min: 0, max: 100, section: "ภาษี", hidden: (v) => v.tax_method !== "fixed_rate", validate: pct },
   { name: "tax_paid_by_employer", label: "นายจ้างออกภาษีแทน", type: "boolean", section: "ภาษี" },
-  { name: "prev_employer_income", label: "เงินได้จากนายจ้างเดิม (ปีนี้)", type: "money", min: 0, section: "รายได้สะสมจากนายจ้างเดิม (ปีภาษีนี้)" },
+  { name: "prev_employer_income", label: "เงินได้จากนายจ้างเดิม (ปีที่เริ่มงาน)", type: "money", min: 0, section: "รายได้สะสมจากนายจ้างเดิม (ปีภาษีนี้)" },
   { name: "prev_employer_tax", label: "ภาษีที่ถูกหักแล้ว", type: "money", min: 0, section: "รายได้สะสมจากนายจ้างเดิม (ปีภาษีนี้)" },
   { name: "prev_employer_sso", label: "ประกันสังคมที่จ่ายแล้ว", type: "money", min: 0, section: "รายได้สะสมจากนายจ้างเดิม (ปีภาษีนี้)" },
   { name: "prev_employer_pvd", label: "กองทุนสำรองฯ ที่สะสมแล้ว", type: "money", min: 0, section: "รายได้สะสมจากนายจ้างเดิม (ปีภาษีนี้)" },

@@ -4,6 +4,31 @@
 	tls {$TLS_MODE:internal}
 	encode zstd gzip
 
+	# Auth service: the browser only needs "who am I", session refresh and sign-out.
+	# Sign-in and password changes go through the app's server actions, which enforce the lockout, the per-IP
+	# throttle and the password policy and reach the auth service inside the docker network (http://kong:8000).
+	# Everything else on /auth/v1 (password grant, sign-up, recovery, OTP, PUT /user, admin) is closed from outside —
+	# otherwise the lockout can be bypassed by calling the auth service directly.
+	@auth_closed {
+		path /auth/v1/*
+		not {
+			method GET
+			path /auth/v1/user
+		}
+		not {
+			method POST
+			path /auth/v1/token
+			query grant_type=refresh_token
+		}
+		not {
+			method POST
+			path /auth/v1/logout
+		}
+	}
+	handle @auth_closed {
+		respond 404
+	}
+
 	# Supabase API on the same origin (no CORS, one certificate)
 	@supabase path /auth/v1/* /rest/v1/* /storage/v1/* /realtime/v1/*
 	handle @supabase {

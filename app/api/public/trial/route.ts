@@ -100,16 +100,13 @@ export async function POST(req: NextRequest) {
 }
 
 /**
- * Tell the sales team: in-app notification for users who can see settings (LINE delivery follows the
- * normal notification pipeline), plus a direct LINE push to TRIAL_NOTIFY_LINE_TO (a group / user id) when set.
+ * Tell the sales team: in-app notification for administrators (LINE delivery follows the normal notification
+ * pipeline), plus a direct LINE push to TRIAL_NOTIFY_LINE_TO (a group / user id) when set.
+ * Administrators only — the shared demo logins handed to trial visitors must not learn who else signed up.
  */
 async function notifySales(sb: ReturnType<typeof supabaseAdmin>, refNo: string, company: string, headcount: string, text: string) {
-  const { data: users } = await sb.from("profiles").select("id, is_admin, role_groups(permissions)").eq("is_active", true);
-  type U = { id: string; is_admin: boolean; role_groups: { permissions: Record<string, string[]> } | { permissions: Record<string, string[]> }[] | null };
-  const targets = ((users ?? []) as U[]).filter((u) => {
-    const g = Array.isArray(u.role_groups) ? u.role_groups[0] : u.role_groups;
-    return u.is_admin || (g?.permissions?.settings ?? []).includes("view");
-  });
+  const { data: users } = await sb.from("profiles").select("id").eq("is_active", true).eq("is_admin", true);
+  const targets = (users ?? []) as { id: string }[];
   if (targets.length) {
     await sb.from("notifications").insert(
       targets.map((u) => ({ user_id: u.id, title: `ขอทดลองใช้: ${company}`, body: `${refNo} · พนักงาน ${headcount} คน`, link: "/settings/trial-leads", category: "system" })),

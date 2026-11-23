@@ -49,3 +49,6 @@ next-env.d.ts
 
 # backup settings of a customer server (paths of the passphrase file, offsite target)
 deploy/backup.env
+
+# written by deploy/upgrade.sh (previous image tag for rollback)
+deploy/.upgrade-state
