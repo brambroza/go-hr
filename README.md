@@ -226,3 +226,7 @@ npm run dev
 - [docs/GOV-BANK-FILES.md](docs/GOV-BANK-FILES.md) — รูปแบบไฟล์ ภ.ง.ด.1 / สปส. / ธนาคาร
 - [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) — โครงสร้างโค้ด กติกาการพัฒนา สิทธิ์ และฐานข้อมูล
 - [samples/import/README.md](samples/import/README.md) — ไฟล์ตัวอย่างสำหรับนำเข้าข้อมูล
+
+
+
+ิby goalong.co.th
